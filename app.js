@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
     typeFilter: 'all',          // 'all', 'movie', 'series'
     statusFilter: 'all',        // 'all', 'watching', 'plan_to_watch', 'completed', 'favorites'
     movieGenreFilter: 'all',    // 'all' o un género específico como 'Ciencia Ficción'
+    seriesGenreFilter: 'all',   // igual que movieGenreFilter, pero para series
     searchFilter: '',           // Filtro de texto en la biblioteca guardada
     sortBy: 'recent',           // recent, rating, title, year
     apiSearchResults: [],       // Resultados temporales de búsqueda en APIs
@@ -22,6 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Selectores de tipo y estado
     typeTabs: document.querySelectorAll('.type-tab-btn'),
     statusTabs: document.querySelectorAll('.status-tab-btn'),
+    statusFilterSelect: document.getElementById('statusFilterSelect'),
     typeCountAll: document.getElementById('typeCountAll'),
     typeCountMovies: document.getElementById('typeCountMovies'),
     typeCountSeries: document.getElementById('typeCountSeries'),
@@ -40,6 +42,8 @@ document.addEventListener('DOMContentLoaded', () => {
     viewOnlyMoviesBtn: document.getElementById('viewOnlyMoviesBtn'),
     movieGenreBar: document.getElementById('movieGenreBar'),
     movieGenrePills: document.getElementById('movieGenrePills'),
+    seriesGenreBar: document.getElementById('seriesGenreBar'),
+    seriesGenrePills: document.getElementById('seriesGenrePills'),
 
     catalogDivider: document.getElementById('catalogDivider'),
 
@@ -166,30 +170,60 @@ document.addEventListener('DOMContentLoaded', () => {
     const seriesList = filteredItems.filter(i => i.type === 'series');
     let moviesList = filteredItems.filter(i => i.type === 'movie');
     const totalMoviesInLibrary = allItems.filter(i => i.type === 'movie').length;
+    const totalSeriesInLibrary = allItems.filter(i => i.type === 'series').length;
 
-    // Actualizar controles y pills de género para películas
-    updateMovieGenreControls(allItems);
+    // Actualizar controles y pills de género (películas y series)
+    updateGenreFilterUI({
+      items: allItems,
+      type: 'movie',
+      stateKey: 'movieGenreFilter',
+      barEl: DOM.movieGenreBar,
+      pillsEl: DOM.movieGenrePills,
+      selectEl: DOM.movieGenreSelect,
+      activePillClass: GENRE_PILL_ACTIVE_ORANGE,
+      inactivePillClass: GENRE_PILL_INACTIVE
+    });
+    updateGenreFilterUI({
+      items: allItems,
+      type: 'series',
+      stateKey: 'seriesGenreFilter',
+      barEl: DOM.seriesGenreBar,
+      pillsEl: DOM.seriesGenrePills,
+      selectEl: null,
+      activePillClass: GENRE_PILL_ACTIVE_AMBER,
+      inactivePillClass: GENRE_PILL_INACTIVE
+    });
 
     // Filtrar películas por género si está activo
     const isGenreActive = state.movieGenreFilter && state.movieGenreFilter !== 'all';
     let displayedMovies = moviesList;
     if (isGenreActive) {
       const gTarget = state.movieGenreFilter.toLowerCase();
-      displayedMovies = moviesList.filter(m => 
+      displayedMovies = moviesList.filter(m =>
         m.genres && m.genres.some(g => g.toLowerCase() === gTarget)
       );
     }
 
+    // Filtrar series por género si está activo
+    const isSeriesGenreActive = state.seriesGenreFilter && state.seriesGenreFilter !== 'all';
+    let displayedSeries = seriesList;
+    if (isSeriesGenreActive) {
+      const gTarget = state.seriesGenreFilter.toLowerCase();
+      displayedSeries = seriesList.filter(sItem =>
+        sItem.genres && sItem.genres.some(g => g.toLowerCase() === gTarget)
+      );
+    }
+
     // Determinar qué secciones mostrar según el filtro de tipo
-    const showSeries = (state.typeFilter === 'all' || state.typeFilter === 'series') && seriesList.length > 0;
+    const showSeries = (state.typeFilter === 'all' || state.typeFilter === 'series') && (seriesList.length > 0 || (isSeriesGenreActive && totalSeriesInLibrary > 0));
     const showMovies = (state.typeFilter === 'all' || state.typeFilter === 'movie') && (moviesList.length > 0 || (isGenreActive && totalMoviesInLibrary > 0));
 
-    const totalVisible = (state.typeFilter === 'series' 
-      ? seriesList.length 
-      : (state.typeFilter === 'movie' ? displayedMovies.length : (seriesList.length + displayedMovies.length)));
+    const totalVisible = (state.typeFilter === 'series'
+      ? displayedSeries.length
+      : (state.typeFilter === 'movie' ? displayedMovies.length : (displayedSeries.length + displayedMovies.length)));
 
     // Si no hay resultados visibles
-    if (totalVisible === 0 && !isGenreActive) {
+    if (totalVisible === 0 && !isGenreActive && !isSeriesGenreActive) {
       if (DOM.seriesSection) DOM.seriesSection.classList.add('hidden');
       if (DOM.moviesSection) DOM.moviesSection.classList.add('hidden');
       if (DOM.catalogDivider) DOM.catalogDivider.classList.add('hidden');
@@ -214,18 +248,42 @@ document.addEventListener('DOMContentLoaded', () => {
     if (showSeries) {
       DOM.seriesSection.classList.remove('hidden');
       if (DOM.seriesCountBadge) {
-        DOM.seriesCountBadge.textContent = `${seriesList.length} serie${seriesList.length === 1 ? '' : 's'}`;
+        DOM.seriesCountBadge.textContent = isSeriesGenreActive
+          ? `${displayedSeries.length} de ${seriesList.length} (${state.seriesGenreFilter})`
+          : `${seriesList.length} serie${seriesList.length === 1 ? '' : 's'}`;
       }
       if (DOM.seriesSectionSub) {
-        const epWatched = seriesList.reduce((acc, s) => acc + (s.currentEpisode || 0), 0);
-        DOM.seriesSectionSub.textContent = `${seriesList.length} en seguimiento • ${epWatched} episodios vistos`;
+        const epWatched = displayedSeries.reduce((acc, s) => acc + (s.currentEpisode || 0), 0);
+        DOM.seriesSectionSub.textContent = isSeriesGenreActive
+          ? `${displayedSeries.length} serie${displayedSeries.length === 1 ? '' : 's'} de ${state.seriesGenreFilter} • ${epWatched} episodios vistos`
+          : `${seriesList.length} en seguimiento • ${epWatched} episodios vistos`;
       }
       if (DOM.viewOnlySeriesBtn) {
         DOM.viewOnlySeriesBtn.classList.toggle('hidden', state.typeFilter === 'series');
       }
 
       DOM.seriesGrid.innerHTML = '';
-      seriesList.forEach(item => DOM.seriesGrid.appendChild(createItemCard(item)));
+      if (displayedSeries.length === 0 && isSeriesGenreActive) {
+        DOM.seriesGrid.innerHTML = `
+          <div class="col-span-full py-12 text-center text-slate-400 bg-slate-900/40 rounded-2xl border border-slate-800/80 p-6">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10 mx-auto mb-2 text-amber-400/60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
+            <p class="font-bold text-white text-sm">No hay series del género "${state.seriesGenreFilter}"</p>
+            <p class="text-xs text-slate-500 mt-1">Prueba a seleccionar otro género o restablecer el filtro.</p>
+            <button id="resetSeriesGenreBtn" class="mt-3.5 text-xs font-bold px-4 py-2 rounded-xl bg-amber-500 text-slate-950 hover:bg-amber-400 transition-all shadow-md shadow-amber-500/20 cursor-pointer">
+              Ver todos los géneros
+            </button>
+          </div>
+        `;
+        const resetSeriesBtn = DOM.seriesGrid.querySelector('#resetSeriesGenreBtn');
+        if (resetSeriesBtn) {
+          resetSeriesBtn.addEventListener('click', () => {
+            state.seriesGenreFilter = 'all';
+            renderLibrary();
+          });
+        }
+      } else {
+        displayedSeries.forEach(item => DOM.seriesGrid.appendChild(createItemCard(item)));
+      }
     } else {
       DOM.seriesSection.classList.add('hidden');
     }
@@ -292,23 +350,27 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ==========================================
-  // FILTRO DINÁMICO DE GÉNEROS PARA PELÍCULAS
+  // FILTRO DINÁMICO DE GÉNEROS (PELÍCULAS Y SERIES)
   // ==========================================
-  function updateMovieGenreControls(allItems) {
-    const allMovies = allItems.filter(i => i.type === 'movie');
+  // Los géneros son texto libre: cualquiera que se escriba en el campo
+  // "Género(s)" del formulario de edición o de alta manual aparece aquí
+  // automáticamente como una píldora de filtro más, sin necesidad de
+  // configurarlo en ningún sitio.
+  const GENRE_PILL_ACTIVE_ORANGE = 'px-3 py-1.5 rounded-xl text-xs font-bold bg-orange-500 text-slate-950 shadow-md shadow-orange-500/20 border border-orange-400 transition-all cursor-pointer flex items-center gap-1.5 shrink-0';
+  const GENRE_PILL_ACTIVE_AMBER = 'px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20 border border-amber-400 transition-all cursor-pointer flex items-center gap-1.5 shrink-0';
+  const GENRE_PILL_INACTIVE = 'px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-900/90 text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition-all cursor-pointer flex items-center gap-1.5 shrink-0';
 
-    if (DOM.movieGenreBar) {
-      DOM.movieGenreBar.classList.toggle('hidden', allMovies.length === 0);
-    }
-    if (DOM.movieGenreSelect) {
-      DOM.movieGenreSelect.classList.toggle('hidden', allMovies.length === 0);
-    }
+  function updateGenreFilterUI({ items, type, stateKey, barEl, pillsEl, selectEl, activePillClass, inactivePillClass }) {
+    const filtered = items.filter(i => i.type === type);
 
-    if (allMovies.length === 0) return;
+    if (barEl) barEl.classList.toggle('hidden', filtered.length === 0);
+    if (selectEl) selectEl.classList.toggle('hidden', filtered.length === 0);
+
+    if (filtered.length === 0) return;
 
     // Calcular recuentos de géneros
     const genreCounts = {};
-    allMovies.forEach(m => {
+    filtered.forEach(m => {
       if (m.genres && Array.isArray(m.genres)) {
         m.genres.forEach(g => {
           const clean = g.trim();
@@ -321,10 +383,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const uniqueGenres = Object.keys(genreCounts).sort((a, b) => genreCounts[b] - genreCounts[a]);
 
-    // 1. Selector Dropdown en barra superior
-    if (DOM.movieGenreSelect) {
-      const currentSelected = state.movieGenreFilter || 'all';
-      DOM.movieGenreSelect.innerHTML = `<option value="all">Género: Todos (${allMovies.length})</option>`;
+    // 1. Selector Dropdown en barra superior (solo lo tienen las películas)
+    if (selectEl) {
+      const currentSelected = state[stateKey] || 'all';
+      selectEl.innerHTML = `<option value="all">Género: Todos (${filtered.length})</option>`;
       uniqueGenres.forEach(g => {
         const opt = document.createElement('option');
         opt.value = g;
@@ -332,48 +394,44 @@ document.addEventListener('DOMContentLoaded', () => {
         if (g.toLowerCase() === currentSelected.toLowerCase()) {
           opt.selected = true;
         }
-        DOM.movieGenreSelect.appendChild(opt);
+        selectEl.appendChild(opt);
       });
       if (currentSelected !== 'all' && !uniqueGenres.some(g => g.toLowerCase() === currentSelected.toLowerCase())) {
-        state.movieGenreFilter = 'all';
-        DOM.movieGenreSelect.value = 'all';
+        state[stateKey] = 'all';
+        selectEl.value = 'all';
       }
     }
 
-    // 2. Barra de pills en la sección de Películas
-    if (DOM.movieGenrePills) {
-      DOM.movieGenrePills.innerHTML = '';
+    // 2. Barra de pills dentro de la sección correspondiente
+    if (pillsEl) {
+      pillsEl.innerHTML = '';
 
       // Pill 'Todos'
-      const isAll = !state.movieGenreFilter || state.movieGenreFilter === 'all';
+      const isAll = !state[stateKey] || state[stateKey] === 'all';
       const allPill = document.createElement('button');
       allPill.type = 'button';
-      allPill.className = isAll
-        ? 'px-3 py-1.5 rounded-xl text-xs font-bold bg-orange-500 text-slate-950 shadow-md shadow-orange-500/20 border border-orange-400 transition-all cursor-pointer flex items-center gap-1.5 shrink-0'
-        : 'px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-900/90 text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition-all cursor-pointer flex items-center gap-1.5 shrink-0';
-      allPill.innerHTML = `<span>Todos</span><span class="text-[10px] font-bold opacity-80 ${isAll ? 'bg-slate-950/20' : 'bg-black/30'} px-1.5 py-0.5 rounded-full">${allMovies.length}</span>`;
+      allPill.className = isAll ? activePillClass : inactivePillClass;
+      allPill.innerHTML = `<span>Todos</span><span class="text-[10px] font-bold opacity-80 ${isAll ? 'bg-slate-950/20' : 'bg-black/30'} px-1.5 py-0.5 rounded-full">${filtered.length}</span>`;
       allPill.addEventListener('click', () => {
-        state.movieGenreFilter = 'all';
-        if (DOM.movieGenreSelect) DOM.movieGenreSelect.value = 'all';
+        state[stateKey] = 'all';
+        if (selectEl) selectEl.value = 'all';
         renderLibrary();
       });
-      DOM.movieGenrePills.appendChild(allPill);
+      pillsEl.appendChild(allPill);
 
-      // Pills individuales
+      // Pills individuales, una por cada género distinto encontrado
       uniqueGenres.forEach(g => {
-        const isActive = state.movieGenreFilter && state.movieGenreFilter.toLowerCase() === g.toLowerCase();
+        const isActive = state[stateKey] && state[stateKey].toLowerCase() === g.toLowerCase();
         const pill = document.createElement('button');
         pill.type = 'button';
-        pill.className = isActive
-          ? 'px-3 py-1.5 rounded-xl text-xs font-bold bg-orange-500 text-slate-950 shadow-md shadow-orange-500/20 border border-orange-400 transition-all cursor-pointer flex items-center gap-1.5 shrink-0'
-          : 'px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-900/90 text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition-all cursor-pointer flex items-center gap-1.5 shrink-0';
+        pill.className = isActive ? activePillClass : inactivePillClass;
         pill.innerHTML = `<span>${g}</span><span class="text-[10px] font-bold opacity-80 ${isActive ? 'bg-slate-950/20' : 'bg-black/30'} px-1.5 py-0.5 rounded-full">${genreCounts[g]}</span>`;
         pill.addEventListener('click', () => {
-          state.movieGenreFilter = isActive ? 'all' : g;
-          if (DOM.movieGenreSelect) DOM.movieGenreSelect.value = state.movieGenreFilter;
+          state[stateKey] = isActive ? 'all' : g;
+          if (selectEl) selectEl.value = state[stateKey];
           renderLibrary();
         });
-        DOM.movieGenrePills.appendChild(pill);
+        pillsEl.appendChild(pill);
       });
     }
   }
@@ -548,16 +606,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Eventos dentro de la tarjeta
     card.addEventListener('click', (e) => {
-      // Clic en etiqueta de género para películas
+      // Clic en etiqueta de género (películas y series)
       const genreBtn = e.target.closest('[data-genre-click]');
-      if (genreBtn && isMovie) {
+      if (genreBtn) {
         e.stopPropagation();
         const genre = genreBtn.getAttribute('data-genre-click');
-        state.movieGenreFilter = genre;
-        if (state.typeFilter === 'series') state.typeFilter = 'all';
-        if (DOM.movieGenreSelect) DOM.movieGenreSelect.value = genre;
+        if (isMovie) {
+          state.movieGenreFilter = genre;
+          if (state.typeFilter === 'series') state.typeFilter = 'all';
+          if (DOM.movieGenreSelect) DOM.movieGenreSelect.value = genre;
+          showToast(`Filtrando películas por género: "${genre}"`);
+        } else {
+          state.seriesGenreFilter = genre;
+          if (state.typeFilter === 'movie') state.typeFilter = 'all';
+          showToast(`Filtrando series por género: "${genre}"`);
+        }
         renderLibrary();
-        showToast(`Filtrando películas por género: "${genre}"`);
         return;
       }
 
@@ -777,6 +841,17 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
             <h4 class="font-bold text-white text-sm line-clamp-1 mt-1">${item.title}</h4>
             <p class="text-xs text-slate-400 line-clamp-2 mt-1">${item.summary || 'Sin sinopsis disponible.'}</p>
+            ${item.matchedPerson ? `
+              <p class="text-[11px] text-amber-300/90 mt-1 flex items-center gap-1">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4M12 8h.01"></path></svg>
+                <span>${item.matchedRole === 'Director' ? 'Dirigida por' : 'Con'} ${item.matchedPerson}</span>
+              </p>
+            ` : ''}
+            ${Array.isArray(item.cast) && item.cast.length > 0 ? `
+              <p class="text-[11px] text-slate-500 line-clamp-1 mt-1">
+                <span class="text-slate-600">Reparto:</span> ${item.cast.slice(0, 5).join(', ')}
+              </p>
+            ` : ''}
             
             <div class="mt-3 flex flex-wrap items-center justify-between gap-2">
               <select id="statusSelect_${index}" class="text-xs bg-slate-900 text-slate-300 border border-slate-700 rounded-lg px-2 py-1 outline-none focus:border-amber-500">
@@ -1205,6 +1280,27 @@ document.addEventListener('DOMContentLoaded', () => {
       durationEl.textContent = item.duration ? `• ${item.duration}` : '';
     }
     document.getElementById('editSummary').textContent = item.summary || 'Sin sinopsis disponible.';
+
+    const castRow = document.getElementById('editCastRow');
+    const hasCastInfo = item.type === 'movie' && (
+      (item.director && item.director !== 'Desconocido') ||
+      (Array.isArray(item.cast) && item.cast.length > 0)
+    );
+    if (castRow) {
+      if (hasCastInfo) {
+        castRow.classList.remove('hidden');
+        const directorLine = document.getElementById('editDirectorLine');
+        const castLine = document.getElementById('editCastLine');
+        directorLine.innerHTML = (item.director && item.director !== 'Desconocido')
+          ? `<span class="text-slate-500">Dirigida por</span> <span class="font-semibold text-white">${item.director}</span>`
+          : '';
+        castLine.innerHTML = (Array.isArray(item.cast) && item.cast.length > 0)
+          ? `<span class="text-slate-500">Reparto:</span> ${item.cast.slice(0, 5).join(', ')}`
+          : '';
+      } else {
+        castRow.classList.add('hidden');
+      }
+    }
     const editImg = document.getElementById('editPosterImg');
     editImg.alt = item.title || 'Portada';
     editImg.onerror = () => API_SERVICE.handleImgError(editImg, item.type);
@@ -1489,22 +1585,37 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Selector de Estado Secundario
-  DOM.statusTabs.forEach(tab => {
-    tab.addEventListener('click', () => {
-      // Remover clases activas de todos
-      DOM.statusTabs.forEach(t => {
-        t.classList.remove('font-bold', 'text-white', 'bg-slate-800', 'border-slate-700');
-        t.classList.add('font-semibold', 'text-slate-400', 'hover:text-white', 'hover:bg-slate-800/60', 'border-transparent');
-      });
-      // Añadir clases activas al seleccionado
-      tab.classList.remove('font-semibold', 'text-slate-400', 'hover:text-white', 'hover:bg-slate-800/60', 'border-transparent');
-      tab.classList.add('font-bold', 'text-white', 'bg-slate-800', 'border-slate-700');
-      
-      state.statusFilter = tab.getAttribute('data-status-tab');
-      renderLibrary();
+  // Selector de Estado: chips en escritorio, desplegable en móvil.
+  // Ambos representan el mismo state.statusFilter y se mantienen sincronizados
+  // entre sí, para que cambiar de tamaño de ventana no los deje descoordinados.
+  function setStatusFilter(value) {
+    state.statusFilter = value;
+
+    DOM.statusTabs.forEach(t => {
+      const isActive = t.getAttribute('data-status-tab') === value;
+      t.classList.toggle('font-bold', isActive);
+      t.classList.toggle('text-white', isActive);
+      t.classList.toggle('bg-slate-800', isActive);
+      t.classList.toggle('border-slate-700', isActive);
+      t.classList.toggle('font-semibold', !isActive);
+      t.classList.toggle('text-slate-400', !isActive);
+      t.classList.toggle('hover:text-white', !isActive);
+      t.classList.toggle('hover:bg-slate-800/60', !isActive);
+      t.classList.toggle('border-transparent', !isActive);
     });
+
+    if (DOM.statusFilterSelect) DOM.statusFilterSelect.value = value;
+
+    renderLibrary();
+  }
+
+  DOM.statusTabs.forEach(tab => {
+    tab.addEventListener('click', () => setStatusFilter(tab.getAttribute('data-status-tab')));
   });
+
+  if (DOM.statusFilterSelect) {
+    DOM.statusFilterSelect.addEventListener('change', () => setStatusFilter(DOM.statusFilterSelect.value));
+  }
 
   // Botones de Ver Solo Series/Películas en las cabeceras de sección
   if (DOM.viewOnlySeriesBtn) {

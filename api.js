@@ -170,9 +170,10 @@ const API_SERVICE = {
   },
 
   /**
-   * Buscar películas en TMDB.
-   * La búsqueda devuelve datos básicos; para los primeros resultados se piden
-   * los detalles (duración, director, géneros) en paralelo.
+   * Buscar películas en TMDB por título, y también por actor o director:
+   * el mismo cuadro de búsqueda prueba ambas cosas a la vez, sin modo aparte.
+   * Para los primeros resultados se piden detalles (duración, director,
+   * reparto, géneros) en paralelo.
    */
   async searchMovies(query) {
     if (!this.hasTmdbKey()) return [];
@@ -183,52 +184,124 @@ const API_SERVICE = {
         this.getTmdbMovieGenres()
       ]);
 
-      const results = (data.results || []).slice(0, 12);
-      if (results.length === 0) return [];
+      const titleResults = (data.results || []).slice(0, 12);
+      const titleIds = new Set(titleResults.map(m => m.id));
 
-      // Detalles + equipo técnico de los 10 primeros; el resto usa datos básicos
-      const detailed = await Promise.all(
-        results.map((movie, index) =>
-          index < 10
-            ? this.fetchJson(this.tmdbUrl(`/movie/${movie.id}`, { append_to_response: 'credits' }), { timeout: 8000, retries: 0 })
-                .catch(() => null)
-            : Promise.resolve(null)
-        )
-      );
+      const personResults = await this._searchMoviesByPerson(query, titleIds);
+      // Con una persona reconocible, sus créditos van antes que coincidencias
+      // de título incidentales (p. ej. documentales menores sobre esa misma
+      // persona, que si no compiten con sus películas de verdad).
+      const combined = [...personResults, ...titleResults].slice(0, 18);
 
-      return results.map((movie, index) => {
-        const detail = detailed[index];
-        const genres = detail?.genres?.length
-          ? detail.genres.map(g => g.name)
-          : (movie.genre_ids || []).map(id => genreMap.get(id)).filter(Boolean);
+      if (combined.length === 0) return [];
 
-        const director = detail?.credits?.crew?.find(person => person.job === 'Director')?.name || 'Desconocido';
-        const runtime = detail?.runtime || null;
-        const poster = this.tmdbImage(movie.poster_path, 'w500');
-
-        return {
-          apiId: `tmdb_${movie.id}`,
-          originalId: movie.id,
-          title: movie.title || movie.original_title || query,
-          type: 'movie',
-          poster: poster || this.getPlaceholderPoster(movie.title, 'movie'),
-          backdrop: this.tmdbImage(movie.backdrop_path, 'w1280') || poster,
-          year: movie.release_date ? movie.release_date.substring(0, 4) : 'N/A',
-          genres: genres.length ? genres : ['Cine'],
-          status: detail?.status || 'Released',
-          summary: movie.overview || detail?.overview || 'Sin descripción disponible.',
-          rating: movie.vote_average ? Number(movie.vote_average).toFixed(1) : null,
-          director: director,
-          durationMinutes: runtime,
-          duration: runtime ? `${runtime} min` : null,
-          previewUrl: null,
-          officialSite: detail?.homepage || `https://www.themoviedb.org/movie/${movie.id}`
-        };
-      });
+      return await this._buildMovieCards(combined, genreMap, query);
     } catch (error) {
       console.warn('TMDB no disponible, no se pudieron buscar películas:', error.message || error);
       return [];
     }
+  },
+
+  /**
+   * Busca películas donde el texto coincide con un actor o director, no con
+   * el título. TMDB no distingue bien "actor" de "director" en el campo
+   * known_for_department (a Clint Eastwood lo marca como "Acting" aunque
+   * tenga decenas de películas dirigidas), así que se combinan siempre los
+   * créditos de reparto y de dirección de la persona encontrada.
+   */
+  async _searchMoviesByPerson(query, excludeIds = new Set()) {
+    try {
+      const data = await this.fetchJson(
+        this.tmdbUrl('/search/person', { query, include_adult: 'false' }),
+        { timeout: 6000, retries: 0 }
+      );
+
+      const person = (data.results || [])[0];
+      if (!person || (person.popularity || 0) < 2) return [];
+
+      const credits = await this.fetchJson(
+        this.tmdbUrl(`/person/${person.id}/movie_credits`),
+        { timeout: 6000, retries: 0 }
+      );
+
+      const directed = (credits.crew || []).filter(c => c.job === 'Director');
+      const acted = credits.cast || [];
+
+      const pool = [
+        ...directed.map(m => ({ ...m, _matchedRole: 'Director' })),
+        ...acted.map(m => ({ ...m, _matchedRole: 'Actor' }))
+      ];
+
+      const seen = new Set(excludeIds);
+      const results = [];
+
+      pool.forEach(movie => {
+        if (!movie.id || seen.has(movie.id)) return;
+        seen.add(movie.id);
+        results.push({ ...movie, _matchedPerson: person.name });
+      });
+
+      // Se ordena por popularidad, no por fecha: TMDB registra como "reparto"
+      // cualquier aparición como "Self" en documentales y homenajes, casi
+      // siempre con fecha más reciente que sus películas de verdad, que
+      // quedarían enterradas si se ordenara por estreno.
+      results.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+
+      return results.slice(0, 8);
+    } catch (error) {
+      console.warn('TMDB: no se pudo buscar por actor/director:', error.message || error);
+      return [];
+    }
+  },
+
+  /**
+   * Convierte resultados básicos de TMDB (de /search/movie o de créditos de
+   * una persona) en las tarjetas que usa el resto de la app. Solo se piden
+   * detalles completos (duración, director, reparto) de los 10 primeros.
+   */
+  async _buildMovieCards(basicResults, genreMap, fallbackTitle) {
+    const detailed = await Promise.all(
+      basicResults.map((movie, index) =>
+        index < 10
+          ? this.fetchJson(this.tmdbUrl(`/movie/${movie.id}`, { append_to_response: 'credits' }), { timeout: 8000, retries: 0 })
+              .catch(() => null)
+          : Promise.resolve(null)
+      )
+    );
+
+    return basicResults.map((movie, index) => {
+      const detail = detailed[index];
+      const genres = detail?.genres?.length
+        ? detail.genres.map(g => g.name)
+        : (movie.genre_ids || []).map(id => genreMap.get(id)).filter(Boolean);
+
+      const director = detail?.credits?.crew?.find(person => person.job === 'Director')?.name || 'Desconocido';
+      const cast = (detail?.credits?.cast || []).slice(0, 5).map(person => person.name);
+      const runtime = detail?.runtime || null;
+      const poster = this.tmdbImage(movie.poster_path, 'w500');
+
+      return {
+        apiId: `tmdb_${movie.id}`,
+        originalId: movie.id,
+        title: movie.title || movie.original_title || fallbackTitle,
+        type: 'movie',
+        poster: poster || this.getPlaceholderPoster(movie.title, 'movie'),
+        backdrop: this.tmdbImage(movie.backdrop_path, 'w1280') || poster,
+        year: movie.release_date ? movie.release_date.substring(0, 4) : 'N/A',
+        genres: genres.length ? genres : ['Cine'],
+        status: detail?.status || 'Released',
+        summary: movie.overview || detail?.overview || 'Sin descripción disponible.',
+        rating: movie.vote_average ? Number(movie.vote_average).toFixed(1) : null,
+        director: director,
+        cast: cast,
+        durationMinutes: runtime,
+        duration: runtime ? `${runtime} min` : null,
+        previewUrl: null,
+        officialSite: detail?.homepage || `https://www.themoviedb.org/movie/${movie.id}`,
+        matchedPerson: movie._matchedPerson || null,
+        matchedRole: movie._matchedRole || null
+      };
+    });
   },
 
   /**

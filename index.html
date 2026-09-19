@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CineTrack - Tracker de Series y Películas</title>
+
+  <!-- Instalación en el móvil: icono propio y arranque sin barra del navegador -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#f59e0b">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+
+  <!-- iOS no lee el manifest: necesita sus propias etiquetas -->
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="CineTrack">
+  <meta name="mobile-web-app-capable" content="yes">
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#fffbeb',
+              100: '#fef3c7',
+              500: '#f59e0b',
+              600: '#d97706',
+              700: '#b45309',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Google Fonts: Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Estilos complementarios -->
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="min-h-screen flex flex-col bg-[#090c10] text-slate-100 selection:bg-amber-500 selection:text-slate-950">
+
+  <!-- ========================================== -->
+  <!-- BARRA DE NAVEGACIÓN SUPERIOR               -->
+  <!-- ========================================== -->
+  <header class="sticky top-0 z-40 glass-nav">
+    <div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between gap-2 sm:gap-4">
+      
+      <!-- Logotipo & Nombre -->
+      <div class="flex items-center gap-3 select-none">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 flex items-center justify-center text-slate-950 shadow-md shadow-amber-500/20">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect>
+            <line x1="7" y1="2" x2="7" y2="22"></line>
+            <line x1="17" y1="2" x2="17" y2="22"></line>
+            <line x1="2" y1="12" x2="22" y2="12"></line>
+            <line x1="2" y1="7" x2="7" y2="7"></line>
+            <line x1="2" y1="17" x2="7" y2="17"></line>
+            <line x1="17" y1="17" x2="22" y2="17"></line>
+            <line x1="17" y1="7" x2="22" y2="7"></line>
+          </svg>
+        </div>
+        <div>
+          <span class="text-xl font-black tracking-tight text-white">
+            Cine<span class="text-amber-400">Track</span>
+          </span>
+          <span class="hidden sm:block text-[10px] uppercase font-bold tracking-widest text-slate-500 -mt-1">
+            Series & Movies
+          </span>
+        </div>
+      </div>
+
+      <!-- Acciones de cabecera -->
+      <div class="flex items-center gap-1.5 sm:gap-2.5">
+        
+        <!-- Botón Búsqueda en APIs (Principal) -->
+        <button id="openSearchModalBtn" class="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-bold text-xs sm:text-sm px-4 py-2.5 rounded-xl shadow-lg shadow-amber-500/15 flex items-center gap-2 transition-all transform hover:scale-[1.02] active:scale-95">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <span class="hidden sm:inline">Buscar en API</span>
+          <span class="sm:hidden">Buscar</span>
+        </button>
+
+        <!-- Botón Añadir Manual -->
+        <button id="openManualModalBtn" title="Añadir título manualmente" class="bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white p-2.5 rounded-xl border border-slate-700/60 transition-colors focus:outline-none focus:border-amber-500">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+        </button>
+
+        <!-- Menú de Opciones / Backup -->
+        <div class="relative">
+          <button 
+            id="optionsDropdownBtn" 
+            type="button"
+            class="bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white p-2.5 rounded-xl border border-slate-700/60 transition-all flex items-center justify-center focus:outline-none focus:border-amber-500" 
+            title="Opciones y Copias de Seguridad"
+            aria-label="Opciones de copia de seguridad">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            </svg>
+          </button>
+
+          <!-- Dropdown Desplegable -->
+          <div 
+            id="optionsDropdownMenu" 
+            class="hidden absolute right-0 top-full mt-2 w-[min(16rem,calc(100vw-1.5rem))] bg-slate-900 border border-slate-700/80 rounded-2xl p-2 shadow-2xl shadow-black/80 z-50 animate-fade-in divide-y divide-slate-800">
+            
+            <div class="px-3 py-2">
+              <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Datos y Respaldos</span>
+              <p class="text-[11px] text-slate-500 mt-0.5">Administra tu biblioteca local</p>
+            </div>
+
+            <div class="py-1.5 space-y-1">
+              <!-- Exportar -->
+              <button 
+                id="exportBtn" 
+                type="button"
+                class="w-full text-left px-3 py-2.5 rounded-xl hover:bg-slate-800 text-slate-200 hover:text-white transition-colors flex items-center gap-3 group">
+                <div class="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center shrink-0 group-hover:bg-amber-500 group-hover:text-slate-950 transition-colors">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                  </svg>
+                </div>
+                <div class="min-w-0">
+                  <span class="text-xs font-semibold block text-slate-200 group-hover:text-white">Descargar Copia</span>
+                  <span class="text-[10px] text-slate-400 block">Guardar archivo JSON</span>
+                </div>
+              </button>
+
+              <!-- Importar -->
+              <button 
+                id="importBtn" 
+                type="button"
+                class="w-full text-left px-3 py-2.5 rounded-xl hover:bg-slate-800 text-slate-200 hover:text-white transition-colors flex items-center gap-3 group">
+                <div class="w-8 h-8 rounded-lg bg-orange-500/10 border border-orange-500/20 text-orange-400 flex items-center justify-center shrink-0 group-hover:bg-orange-500 group-hover:text-white transition-colors">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="17 8 12 3 7 8"></polyline>
+                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                  </svg>
+                </div>
+                <div class="min-w-0">
+                  <span class="text-xs font-semibold block text-slate-200 group-hover:text-white">Restaurar Copia</span>
+                  <span class="text-[10px] text-slate-400 block">Importar archivo JSON</span>
+                </div>
+              </button>
+              <input type="file" id="importFileInput" accept=".json" class="hidden" />
+            </div>
+
+            <!-- Clave de TMDB -->
+            <div class="py-1.5">
+              <button 
+                id="apiKeyBtn" 
+                type="button"
+                class="w-full text-left px-3 py-2.5 rounded-xl hover:bg-slate-800 text-slate-200 hover:text-white transition-colors flex items-center gap-3 group">
+                <div class="w-8 h-8 rounded-lg bg-sky-500/10 border border-sky-500/20 text-sky-400 flex items-center justify-center shrink-0 group-hover:bg-sky-500 group-hover:text-white transition-colors">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path>
+                  </svg>
+                </div>
+                <div class="min-w-0">
+                  <span class="text-xs font-semibold block text-slate-200 group-hover:text-white">Clave de TMDB</span>
+                  <span id="apiKeyMenuState" class="text-[10px] text-slate-400 block">Necesaria para buscar películas</span>
+                </div>
+              </button>
+            </div>
+
+            <!-- Restablecer -->
+            <div class="pt-1.5">
+              <button 
+                id="resetDemoBtn" 
+                type="button"
+                class="w-full text-left px-3 py-2.5 rounded-xl hover:bg-rose-500/10 text-rose-400 hover:text-rose-300 transition-colors flex items-center gap-3 group">
+                <div class="w-8 h-8 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center shrink-0 group-hover:bg-rose-600 group-hover:text-white transition-colors">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="1 4 1 10 7 10"></polyline>
+                    <polyline points="23 20 23 14 17 14"></polyline>
+                    <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"></path>
+                  </svg>
+                </div>
+                <div class="min-w-0">
+                  <span class="text-xs font-semibold block text-rose-300">Restablecer Ejemplos</span>
+                  <span class="text-[10px] text-rose-400/70 block">Volver a los datos de prueba</span>
+                </div>
+              </button>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </header>
+
+  <!-- Iluminación ambiental cinemática (Ámbar y Naranja) -->
+  <div class="fixed inset-0 pointer-events-none overflow-hidden -z-10">
+    <div class="absolute -top-32 -left-32 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl"></div>
+    <div class="absolute top-72 -right-32 w-96 h-96 bg-orange-500/10 rounded-full blur-3xl"></div>
+    <div class="absolute -bottom-32 left-1/3 w-[30rem] h-[30rem] bg-yellow-600/5 rounded-full blur-3xl"></div>
+  </div>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow w-full">
+
+    <!-- ========================================== -->
+    <!-- SELECTOR DE TIPO PRINCIPAL (DIVISIÓN CLARA) -->
+    <!-- ========================================== -->
+    <div class="mb-5 flex flex-col md:flex-row items-center justify-between gap-4">
+      
+      <!-- Switcher Principal: Todo | Películas | Series -->
+      <div class="flex p-1.5 bg-slate-900/90 rounded-2xl border border-slate-800 shadow-xl w-full sm:w-auto">
+        
+        <!-- Pestaña: Todo -->
+        <button 
+          data-type-tab="all" 
+          class="type-tab-btn flex-1 sm:flex-initial px-2.5 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 shadow-lg shadow-amber-500/20">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 hidden sm:block" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+          <span>Todo</span>
+          <span id="typeCountAll" class="px-2 py-0.5 rounded-full text-[11px] bg-black/20 font-black">0</span>
+        </button>
+
+        <!-- Pestaña: Películas -->
+        <button 
+          data-type-tab="movie" 
+          class="type-tab-btn flex-1 sm:flex-initial px-2.5 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-2 text-slate-400 hover:text-white hover:bg-slate-800/80">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-orange-400 hidden sm:block" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect><line x1="7" y1="2" x2="7" y2="22"></line><line x1="17" y1="2" x2="17" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line></svg>
+          <span>Películas</span>
+          <span id="typeCountMovies" class="px-2 py-0.5 rounded-full text-[11px] bg-orange-500/20 text-orange-300 font-bold">0</span>
+        </button>
+
+        <!-- Pestaña: Series -->
+        <button 
+          data-type-tab="series" 
+          class="type-tab-btn flex-1 sm:flex-initial px-2.5 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-2 text-slate-400 hover:text-white hover:bg-slate-800/80">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-amber-400 hidden sm:block" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect><polyline points="17 2 12 7 7 2"></polyline></svg>
+          <span>Series</span>
+          <span id="typeCountSeries" class="px-2 py-0.5 rounded-full text-[11px] bg-amber-500/20 text-amber-300 font-bold">0</span>
+        </button>
+      </div>
+
+      <!-- Buscador y Ordenador en el catálogo -->
+      <div class="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
+        <div class="relative w-full sm:flex-grow md:w-64">
+          <input 
+            type="text" 
+            id="searchInput" 
+            placeholder="Buscar en tu lista..."
+            class="w-full bg-slate-900/90 text-slate-200 placeholder-slate-500 text-xs px-3.5 py-2.5 pl-9 rounded-xl border border-slate-700/60 focus:outline-none focus:border-amber-500 transition-colors"
+          />
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-slate-500 absolute left-3 top-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        </div>
+
+        <select id="movieGenreSelect" title="Filtrar películas por género" class="flex-1 sm:flex-none min-w-0 bg-slate-900/90 text-slate-300 text-xs px-3 py-2.5 rounded-xl border border-slate-700/60 focus:outline-none focus:border-orange-500 transition-colors">
+          <option value="all">Género: Todos</option>
+        </select>
+
+        <select id="sortSelect" class="flex-1 sm:flex-none min-w-0 bg-slate-900/90 text-slate-300 text-xs px-3 py-2.5 rounded-xl border border-slate-700/60 focus:outline-none focus:border-amber-500">
+          <option value="recent">Recientes</option>
+          <option value="rating">Mayor Puntuación</option>
+          <option value="title">Título A-Z</option>
+          <option value="year">Año de Estreno</option>
+        </select>
+      </div>
+
+    </div>
+
+    <!-- ========================================== -->
+    <!-- FILTRO SECUNDARIO: ESTADO                  -->
+    <!-- ========================================== -->
+    <div class="glass-panel p-2.5 rounded-2xl mb-8 flex items-center gap-2 overflow-x-auto scrollbar-none scroll-fade">
+      <span class="text-xs font-bold text-slate-400 uppercase tracking-wider px-2 shrink-0 hidden sm:inline">Estado:</span>
+      <button data-status-tab="all" class="status-tab-btn px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-slate-800 border border-slate-700 transition-all whitespace-nowrap">
+        Todos los Estados
+      </button>
+      <button data-status-tab="watching" class="status-tab-btn px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent transition-all flex items-center gap-1.5 whitespace-nowrap">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 inline-block"></span>
+        Viendo
+      </button>
+      <button data-status-tab="plan_to_watch" class="status-tab-btn px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent transition-all flex items-center gap-1.5 whitespace-nowrap">
+        <span class="w-2 h-2 rounded-full bg-amber-400 inline-block"></span>
+        Por Ver
+      </button>
+      <button data-status-tab="completed" class="status-tab-btn px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent transition-all flex items-center gap-1.5 whitespace-nowrap">
+        <span class="w-2 h-2 rounded-full bg-orange-400 inline-block"></span>
+        Completadas
+      </button>
+      <button data-status-tab="favorites" class="status-tab-btn px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent transition-all flex items-center gap-1.5 whitespace-nowrap">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 text-rose-500 fill-rose-500" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+        Favoritas
+      </button>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- CONTENIDO DEL CATÁLOGO (DIVIDIDO)         -->
+    <!-- ========================================== -->
+    <div id="catalogContainer" class="space-y-12">
+      
+      <!-- SECCIÓN: PELÍCULAS Y CINE -->
+      <section id="moviesSection" class="transition-all">
+        <div class="flex flex-wrap items-center justify-between gap-y-2.5 mb-5 border-b border-orange-500/20 pb-3">
+          <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-xl bg-orange-500/10 border border-orange-500/25 text-orange-400 flex items-center justify-center shadow-md shadow-orange-950/50">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect><line x1="7" y1="2" x2="7" y2="22"></line><line x1="17" y1="2" x2="17" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line></svg>
+            </div>
+            <div>
+              <h2 class="text-base sm:text-xl font-extrabold text-white tracking-tight flex flex-wrap items-center gap-x-2 gap-y-1">
+                <span>Películas y Cine</span>
+                <span id="moviesCountBadge" class="text-xs font-bold bg-orange-500/15 text-orange-300 border border-orange-500/30 px-2.5 py-0.5 rounded-full">
+                  0 películas
+                </span>
+              </h2>
+              <p id="moviesSectionSub" class="text-xs text-slate-400 mt-0.5">Largometrajes con duración real y calificaciones</p>
+            </div>
+          </div>
+          <button id="viewOnlyMoviesBtn" class="text-xs font-semibold text-orange-400 hover:text-orange-300 hover:bg-orange-500/10 px-3 py-1.5 rounded-xl border border-orange-500/30 transition-all flex items-center gap-1">
+            <span>Ver solo películas</span>
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </button>
+        </div>
+
+        <!-- Barra interactiva de filtros de género para películas -->
+        <div id="movieGenreBar" class="mb-5 flex flex-wrap items-center gap-2 pb-1.5">
+          <div class="flex items-center gap-1.5 text-xs font-bold text-slate-400 uppercase tracking-wider shrink-0 w-full sm:w-auto mb-1 sm:mb-0 sm:mr-1">
+            <svg class="w-3.5 h-3.5 text-orange-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 6h16M4 12h10M4 18h6"/></svg>
+            <span>Género:</span>
+          </div>
+          <div id="movieGenrePills" class="flex items-center gap-1.5 flex-wrap">
+            <!-- Inyectado dinámicamente con JS -->
+          </div>
+        </div>
+
+        <div id="moviesGrid" class="poster-grid">
+          <!-- Inyectado dinámicamente -->
+        </div>
+      </section>
+
+      <!-- SEPARADOR DECORATIVO ENTRE PELÍCULAS Y SERIES -->
+      <div id="catalogDivider" class="section-divider"></div>
+
+      <!-- SECCIÓN: SERIES DE TELEVISIÓN -->
+      <section id="seriesSection" class="transition-all">
+        <div class="flex flex-wrap items-center justify-between gap-y-2.5 mb-5 border-b border-amber-500/20 pb-3">
+          <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-400 flex items-center justify-center shadow-md shadow-amber-950/50">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect><polyline points="17 2 12 7 7 2"></polyline></svg>
+            </div>
+            <div>
+              <h2 class="text-base sm:text-xl font-extrabold text-white tracking-tight flex flex-wrap items-center gap-x-2 gap-y-1">
+                <span>Series de Televisión</span>
+                <span id="seriesCountBadge" class="text-xs font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30 px-2.5 py-0.5 rounded-full">
+                  0 series
+                </span>
+              </h2>
+              <p id="seriesSectionSub" class="text-xs text-slate-400 mt-0.5">Seguimiento por temporadas y episodios</p>
+            </div>
+          </div>
+          <button id="viewOnlySeriesBtn" class="text-xs font-semibold text-amber-400 hover:text-amber-300 hover:bg-amber-500/10 px-3 py-1.5 rounded-xl border border-amber-500/30 transition-all flex items-center gap-1">
+            <span>Ver solo series</span>
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </button>
+        </div>
+
+        <div id="seriesGrid" class="poster-grid">
+          <!-- Inyectado dinámicamente -->
+        </div>
+      </section>
+
+    </div>
+
+    <!-- Estado vacío cuando no hay títulos -->
+    <div id="emptyState" class="hidden text-center py-20 glass-panel rounded-3xl p-8 max-w-lg mx-auto my-8 animate-fade-in">
+      <div class="w-20 h-20 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center mx-auto mb-4">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+      </div>
+      <h3 id="emptyStateTitle" class="text-xl font-bold text-white mb-2">No hay títulos en esta sección</h3>
+      <p id="emptyStateDesc" class="text-sm text-slate-400 mb-6">Utiliza el buscador con API para encontrar series y películas con sus carátulas oficiales en alta calidad.</p>
+      <button id="heroSearchBtn" class="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-bold text-sm px-6 py-2.5 rounded-xl shadow-lg shadow-amber-500/20 inline-flex items-center gap-2 transition-all">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+        Buscar en la API
+      </button>
+    </div>
+
+  </main>
+
+  <!-- ========================================== -->
+  <!-- MODAL: BÚSQUEDA EN APIS PÚBLICAS          -->
+  <!-- ========================================== -->
+  <div id="searchModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md hidden flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="glass-panel w-full max-w-2xl max-h-[92vh] sm:max-h-[85vh] rounded-t-3xl sm:rounded-3xl flex flex-col shadow-2xl overflow-hidden border border-slate-700/80 animate-fade-in">
+      
+      <!-- Cabecera del buscador -->
+      <div class="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-amber-500/15 text-amber-400 flex items-center justify-center">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          </div>
+          <div>
+            <h3 class="font-bold text-white text-base">Explorador de Series y Películas</h3>
+            <p class="text-[11px] text-slate-400">Portadas e información obtenidas de TVMaze & TMDB</p>
+          </div>
+        </div>
+        <button id="closeSearchModalBtn" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-all">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+
+      <!-- Barra de entrada y selector de API -->
+      <div class="p-3 sm:p-4 bg-slate-900/50 border-b border-slate-800/80 flex flex-col sm:flex-row gap-2.5 sm:gap-3">
+        <div class="relative flex-grow">
+          <input 
+            type="text" 
+            id="apiSearchInput" 
+            placeholder="Ej: Stranger Things, Breaking Bad, Inception, Dune..." 
+            class="w-full bg-slate-900 text-white placeholder-slate-500 text-sm px-4 py-2.5 pl-10 rounded-xl border border-slate-700 focus:outline-none focus:border-amber-500"
+          />
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-slate-500 absolute left-3.5 top-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        </div>
+        <select id="apiFilterSelect" class="bg-slate-900 text-slate-300 text-xs px-3 py-2.5 rounded-xl border border-slate-700 focus:outline-none focus:border-amber-500">
+          <option value="all">Todo (Series y Películas)</option>
+          <option value="series">Solo Series (TVMaze)</option>
+          <option value="movie">Solo Películas (TMDB)</option>
+        </select>
+      </div>
+
+      <!-- Contenedor de Resultados con Scroll -->
+      <div class="p-3.5 sm:p-5 overflow-y-auto flex-grow overscroll-contain">
+        
+        <!-- Estado de carga -->
+        <div id="apiSearchLoading" class="hidden py-12 text-center text-amber-400">
+          <svg class="animate-spin h-8 w-8 mx-auto mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <p class="text-xs text-slate-400 font-medium">Buscando portadas e información en tiempo real...</p>
+        </div>
+
+        <!-- Estado inicial vacío -->
+        <div id="apiSearchEmpty" class="py-12 text-center text-slate-500">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-12 h-12 mx-auto mb-3 text-slate-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect><line x1="7" y1="2" x2="7" y2="22"></line><line x1="17" y1="2" x2="17" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line></svg>
+          <p class="text-sm font-medium text-slate-400">Escribe el nombre de cualquier película o serie para buscar</p>
+          <p class="text-xs text-slate-600 mt-1">Descarga automática de carátulas en alta resolución</p>
+        </div>
+
+        <!-- Resultados en Grid -->
+        <div id="apiSearchResults" class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <!-- Inyectado dinámicamente -->
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAL: DETALLES Y EDICIÓN COMPLETA        -->
+  <!-- ========================================== -->
+  <div id="editModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md hidden flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="glass-panel w-full max-w-2xl max-h-[92vh] sm:max-h-[90vh] rounded-t-3xl sm:rounded-3xl flex flex-col shadow-2xl overflow-hidden border border-slate-700/80 animate-fade-in">
+      
+      <div class="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between">
+        <h3 class="font-bold text-white text-base">Detalle y Seguimiento</h3>
+        <button id="closeEditModalBtn" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-all">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+
+      <div class="p-4 sm:p-6 overflow-y-auto flex-grow overscroll-contain">
+        
+        <!-- Encabezado con carátula y sinopsis -->
+        <div class="flex gap-4 mb-6">
+          <img id="editPosterImg" src="" alt="Portada" class="w-24 h-36 object-cover rounded-xl shadow-lg bg-slate-800 shrink-0" onerror="API_SERVICE.handleImgError(this, 'movie')" />
+          <div>
+            <div class="flex items-center gap-2 mb-1">
+              <span id="editTypeBadge" class="text-xs font-bold uppercase tracking-wider text-white px-2 py-0.5 rounded"></span>
+              <span id="editYear" class="text-xs text-slate-400 font-medium"></span>
+              <span id="editDurationBadge" class="text-xs text-slate-400 font-medium"></span>
+            </div>
+            <h4 id="editTitle" class="text-lg font-black text-white line-clamp-1"></h4>
+            <p id="editSummary" class="text-xs text-slate-400 line-clamp-4 mt-1.5 leading-relaxed"></p>
+          </div>
+        </div>
+
+        <!-- Formulario de actualización -->
+        <form id="editForm" class="space-y-4">
+          <input type="hidden" id="editItemId" />
+
+          <!-- Estado y Plataforma -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-400 mb-1.5">Estado</label>
+              <select id="editStatus" class="w-full bg-slate-900 text-slate-200 text-xs px-3 py-2.5 rounded-xl border border-slate-700 focus:outline-none focus:border-amber-500">
+                <option value="watching">Viendo actualmente</option>
+                <option value="plan_to_watch">Por ver (Pendiente)</option>
+                <option value="completed">Completada</option>
+                <option value="on_hold">En pausa / Abandonada</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-400 mb-1.5">Plataforma</label>
+              <select id="editPlatform" class="w-full bg-slate-900 text-slate-200 text-xs px-3 py-2.5 rounded-xl border border-slate-700 focus:outline-none focus:border-amber-500">
+                <option value="Netflix">Netflix</option>
+                <option value="Max">Max (HBO)</option>
+                <option value="Prime Video">Amazon Prime</option>
+                <option value="Disney+">Disney+</option>
+                <option value="Apple TV+">Apple TV+</option>
+                <option value="Cine">Cine / Pantalla Grande</option>
+                <option value="General">Otra / General</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Controles interactivos de temporadas y capítulos (Solo visible para series) -->
+          <div id="seriesEpisodeControls" class="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-3.5 shadow-inner">
+            <!-- Hidden inputs para retrocompatibilidad con el form y storage -->
+            <input type="hidden" id="editCurrentSeason" value="1" />
+            <input type="hidden" id="editCurrentEpisode" value="0" />
+            <input type="hidden" id="editTotalEpisodes" value="1" />
+
+            <!-- Encabezado de progreso general y botón completar serie -->
+            <div class="flex items-center justify-between gap-2 flex-wrap">
+              <div>
+                <span class="text-[11px] font-bold text-amber-400 uppercase tracking-wider block">Temporadas y Capítulos</span>
+                <span id="seriesModalProgressText" class="text-xs text-slate-300 font-semibold mt-0.5 block">0 / 0 vistos (0%)</span>
+              </div>
+              <button 
+                type="button" 
+                id="btnToggleAllSeries" 
+                class="text-xs font-bold px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500 text-amber-300 hover:text-slate-950 border border-amber-500/30 transition-all flex items-center gap-1.5 cursor-pointer shadow-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span id="btnToggleAllSeriesText">Marcar serie completa</span>
+              </button>
+            </div>
+
+            <!-- Barra de progreso general de la serie -->
+            <div class="w-full bg-slate-900 rounded-full h-2 overflow-hidden border border-slate-800/80">
+              <div id="seriesModalProgressBar" class="bg-gradient-to-r from-amber-500 to-orange-500 h-2 rounded-full transition-all duration-300 progress-bar-glow" style="width: 0%"></div>
+            </div>
+
+            <!-- Selector horizontal de Temporadas (Tabs) -->
+            <div>
+              <div class="text-[11px] text-slate-400 font-medium mb-1.5 flex items-center justify-between">
+                <span>Selecciona Temporada:</span>
+                <span id="seriesSeasonsSummary" class="text-[11px] text-slate-500 font-normal"></span>
+              </div>
+              <div id="seasonTabsContainer" class="flex items-center gap-1.5 overflow-x-auto pb-1.5 pt-0.5 scrollbar-thin">
+                <!-- Se genera dinámicamente con JS -->
+              </div>
+            </div>
+
+            <!-- Cabecera de la temporada activa y botón marcar temporada completa -->
+            <div class="pt-2 border-t border-slate-800/70 flex flex-wrap items-center justify-between gap-2">
+              <div class="flex items-center gap-2">
+                <span id="activeSeasonHeaderTitle" class="text-xs font-bold text-white uppercase tracking-wider">Temporada 1</span>
+                <span id="activeSeasonBadge" class="text-[11px] font-semibold text-slate-400 px-2 py-0.5 rounded-full bg-slate-900 border border-slate-800">0/0 vistos</span>
+              </div>
+              <button 
+                type="button" 
+                id="btnToggleActiveSeason" 
+                class="text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700/80 transition-all flex items-center gap-1.5 cursor-pointer">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span id="btnToggleActiveSeasonText">Marcar temp. completa</span>
+              </button>
+            </div>
+
+            <!-- Lista interactiva de episodios / capítulos de la temporada activa -->
+            <div id="seasonEpisodesList" class="space-y-1.5 max-h-60 overflow-y-auto pr-1 scrollbar-thin">
+              <!-- Se genera dinámicamente con JS -->
+            </div>
+          </div>
+
+          <!-- Puntuación personal con slider de estrellas -->
+          <div>
+            <div class="flex justify-between items-center mb-1.5">
+              <label class="text-xs font-semibold text-slate-400">Tu Calificación Personal</label>
+              <span id="editRatingValue" class="text-xs font-bold text-amber-400">0 / 10</span>
+            </div>
+            <input type="range" id="editRating" min="0" max="10" step="1" value="0" class="w-full accent-amber-400 cursor-pointer" />
+          </div>
+
+          <!-- Género(s) -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 mb-1.5">Género(s)</label>
+            <input type="text" id="editGenres" placeholder="Ej: Ciencia Ficción, Aventura, Drama" class="w-full bg-slate-900 text-white text-xs px-3.5 py-2.5 rounded-xl border border-slate-700 focus:outline-none focus:border-amber-500" />
+            <span class="text-[10px] text-slate-500 mt-0.5 block">Separados por comas para clasificar y filtrar fácilmente.</span>
+          </div>
+
+          <!-- Carátula / Portada URL -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 mb-1.5">URL de la Carátula / Portada (Opcional)</label>
+            <input type="url" id="editPoster" placeholder="https://ejemplo.com/poster.jpg" class="w-full bg-slate-900 text-white text-xs px-3.5 py-2.5 rounded-xl border border-slate-700 focus:outline-none focus:border-amber-500" />
+          </div>
+
+          <!-- Notas / Reseña -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 mb-1.5">Notas o Reseña Personal</label>
+            <textarea id="editNotes" rows="3" placeholder="¿Qué te pareció el final? ¿Algún capítulo memorable?" class="w-full bg-slate-900 text-slate-200 placeholder-slate-600 text-xs p-3 rounded-xl border border-slate-700 focus:outline-none focus:border-amber-500"></textarea>
+          </div>
+
+          <!-- Acciones de guardar / borrar -->
+          <div class="pt-4 border-t border-slate-800 flex items-center justify-between gap-3">
+            <button type="button" id="deleteItemBtn" class="text-xs font-semibold text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 px-3 py-2 rounded-xl transition-all">
+              Eliminar de mi lista
+            </button>
+            <button type="submit" class="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-bold text-xs px-5 py-2.5 rounded-xl shadow-lg shadow-amber-500/20 transition-all">
+              Guardar Cambios
+            </button>
+          </div>
+        </form>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAL: AÑADIR MANUALMENTE                 -->
+  <!-- ========================================== -->
+  <div id="manualModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md hidden flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="glass-panel w-full max-w-lg max-h-[92vh] sm:max-h-none rounded-t-3xl sm:rounded-3xl flex flex-col shadow-2xl overflow-hidden border border-slate-700/80 animate-fade-in">
+      <div class="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between">
+        <h3 class="font-bold text-white text-base">Añadir Título Manualmente</h3>
+        <button id="closeManualModalBtn" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-all">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+
+      <form id="manualForm" class="p-4 sm:p-6 space-y-4 overflow-y-auto overscroll-contain">
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 mb-1">Título *</label>
+          <input type="text" id="manualTitle" required placeholder="Nombre de la película o serie" class="w-full bg-slate-900 text-white text-xs px-3.5 py-2.5 rounded-xl border border-slate-700 focus:outline-none focus:border-amber-500" />
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 mb-1">Tipo</label>
+            <select id="manualType" class="w-full bg-slate-900 text-slate-200 text-xs px-3 py-2.5 rounded-xl border border-slate-700">
+              <option value="series">Serie de TV</option>
+              <option value="movie">Película</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 mb-1">Estado</label>
+            <select id="manualStatus" class="w-full bg-slate-900 text-slate-200 text-xs px-3 py-2.5 rounded-xl border border-slate-700">
+              <option value="plan_to_watch">Por ver</option>
+              <option value="watching">Viendo</option>
+              <option value="completed">Completada</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 mb-1">Año</label>
+            <input type="text" id="manualYear" placeholder="Ej: 2024" class="w-full bg-slate-900 text-white text-xs px-3.5 py-2 rounded-xl border border-slate-700" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 mb-1">Plataforma</label>
+            <select id="manualPlatform" class="w-full bg-slate-900 text-slate-200 text-xs px-3 py-2.5 rounded-xl border border-slate-700">
+              <option value="Netflix">Netflix</option>
+              <option value="Max">Max</option>
+              <option value="Prime Video">Prime Video</option>
+              <option value="Disney+">Disney+</option>
+              <option value="Cine">Cine</option>
+              <option value="General">Otra</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="manualEpisodeField">
+          <label class="block text-xs font-semibold text-slate-400 mb-1">Total de Episodios Estimados</label>
+          <input type="number" id="manualEpisodes" min="1" value="10" class="w-full bg-slate-900 text-white text-xs px-3.5 py-2 rounded-xl border border-slate-700" />
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 mb-1">Género(s) (Opcional)</label>
+          <input type="text" id="manualGenres" placeholder="Ej: Ciencia Ficción, Acción, Drama" class="w-full bg-slate-900 text-white text-xs px-3.5 py-2 rounded-xl border border-slate-700 focus:outline-none focus:border-amber-500" />
+          <span class="text-[10px] text-slate-500 mt-0.5 block">Separados por comas para clasificar y filtrar fácilmente.</span>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 mb-1">URL de Portada (Opcional)</label>
+          <input type="url" id="manualPoster" placeholder="https://ejemplo.com/poster.jpg" class="w-full bg-slate-900 text-white text-xs px-3.5 py-2.5 rounded-xl border border-slate-700 focus:outline-none focus:border-amber-500" />
+          <span class="text-[10px] text-slate-500 mt-0.5 block">Si se deja vacío, se generará una carátula con estilo automáticamente.</span>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 mb-1">Sinopsis (Opcional)</label>
+          <textarea id="manualSummary" rows="2" placeholder="Resumen breve..." class="w-full bg-slate-900 text-white text-xs p-3 rounded-xl border border-slate-700"></textarea>
+        </div>
+
+        <div class="pt-3 border-t border-slate-800 flex justify-end gap-2">
+          <button type="button" onclick="document.getElementById('manualModal').classList.add('hidden')" class="px-4 py-2 text-xs text-slate-400 hover:text-white">Cancelar</button>
+          <button type="submit" class="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-bold text-xs px-5 py-2 rounded-xl shadow-lg shadow-amber-500/20">Añadir</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAL: CLAVE DE TMDB                       -->
+  <!-- ========================================== -->
+  <div id="apiKeyModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md hidden flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="glass-panel w-full max-w-md max-h-[92vh] sm:max-h-none rounded-t-3xl sm:rounded-3xl flex flex-col shadow-2xl overflow-hidden border border-slate-700/80 animate-fade-in">
+      <div class="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-sky-500/15 text-sky-400 flex items-center justify-center shrink-0">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path>
+            </svg>
+          </div>
+          <h3 class="font-bold text-white text-base">Clave de TMDB</h3>
+        </div>
+        <button id="closeApiKeyModalBtn" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-all">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+
+      <form id="apiKeyForm" class="p-4 sm:p-6 space-y-4 overflow-y-auto overscroll-contain">
+        <p class="text-xs text-slate-400 leading-relaxed">
+          Las búsquedas de películas usan <span class="text-slate-200 font-semibold">The Movie Database</span>, que pide una clave gratuita.
+          Se guarda <span class="text-slate-200 font-semibold">solo en este dispositivo</span>: no viaja a ningún servidor ni queda en el código de la app.
+        </p>
+
+        <div>
+          <label for="apiKeyInput" class="block text-xs font-semibold text-slate-400 mb-1.5">API Key (v3 auth)</label>
+          <input 
+            type="text" 
+            id="apiKeyInput" 
+            autocomplete="off" 
+            spellcheck="false"
+            placeholder="32 caracteres, por ejemplo 8f2a1c4d…" 
+            class="w-full bg-slate-900 text-white text-xs px-3.5 py-2.5 rounded-xl border border-slate-700 focus:outline-none focus:border-sky-500 font-mono" />
+          <span id="apiKeyHint" class="text-[10px] text-slate-500 mt-1 block">
+            La consigues en themoviedb.org → Ajustes → API. Es la clave corta, no el token largo que empieza por eyJ.
+          </span>
+        </div>
+
+        <div class="rounded-xl bg-slate-950/70 border border-slate-800 p-3">
+          <div class="flex items-center gap-2">
+            <span id="apiKeyStatusDot" class="w-2 h-2 rounded-full bg-slate-600 shrink-0"></span>
+            <span id="apiKeyStatus" class="text-[11px] font-semibold text-slate-400">Sin clave guardada</span>
+          </div>
+        </div>
+
+        <div class="pt-3 border-t border-slate-800 flex items-center justify-between gap-3">
+          <button type="button" id="deleteApiKeyBtn" class="text-xs font-semibold text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 px-3 py-2 rounded-xl transition-all">
+            Borrar clave
+          </button>
+          <button type="submit" class="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-bold text-xs px-5 py-2.5 rounded-xl shadow-lg shadow-amber-500/20 transition-all">
+            Guardar
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- TOAST FLOTANTE DE NOTIFICACIONES           -->
+  <!-- ========================================== -->
+  <div id="toast" class="fixed bottom-4 left-4 right-4 sm:left-auto sm:bottom-6 sm:right-6 z-50 flex items-center justify-center sm:justify-start gap-3 px-5 py-3.5 rounded-xl shadow-2xl transition-all duration-300 transform translate-y-8 opacity-0 pointer-events-none font-medium text-sm">
+    <span id="toastMessage">Operación realizada con éxito</span>
+  </div>
+
+  <!-- Scripts de la aplicación -->
+  <script src="api.js"></script>
+  <script src="storage.js"></script>
+  <script src="app.js"></script>
+
+  <!--
+    Registro del service worker. Solo funciona sobre HTTPS o localhost:
+    al abrir el archivo con doble clic (file://) se omite sin dar error.
+  -->
+  <script>
+    if ('serviceWorker' in navigator &&
+        (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(err => {
+          console.warn('No se pudo registrar el service worker:', err.message || err);
+        });
+      });
+    }
+  </script>
+</body>
+</html>
+

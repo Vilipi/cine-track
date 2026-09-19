@@ -1,0 +1,272 @@
+/* Estilos personalizados para CineTrack */
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
+
+:root {
+  --primary: #f59e0b;
+  --primary-hover: #d97706;
+  --accent: #f97316;
+  --bg-dark: #090c10;
+  --card-bg: #11141a;
+  --card-border: rgba(255, 255, 255, 0.06);
+}
+
+body {
+  font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  background-color: var(--bg-dark);
+  color: #f3f4f6;
+  overflow-x: hidden;
+}
+
+/* Scrollbar personalizado */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #090c10;
+}
+::-webkit-scrollbar-thumb {
+  background: #272c35;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3a424e;
+}
+
+/* Efectos de cristal / Glassmorphism (Minimalista) */
+.glass-panel {
+  background: rgba(17, 20, 26, 0.65);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.glass-nav {
+  background: rgba(9, 12, 16, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Efectos de tarjeta tipo póster (Sutiles) */
+.poster-card {
+  position: relative;
+  transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+  box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 14px;
+  overflow: hidden;
+  background-color: #12151c;
+}
+
+.poster-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 18px 32px -12px rgba(0, 0, 0, 0.75);
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+.card-movie:hover {
+  border-color: rgba(249, 115, 22, 0.4);
+}
+
+.card-series:hover {
+  border-color: rgba(245, 158, 11, 0.4);
+}
+
+.poster-overlay {
+  background: linear-gradient(
+    to top,
+    rgba(9, 12, 16, 0.92) 0%,
+    rgba(9, 12, 16, 0.45) 28%,
+    rgba(9, 12, 16, 0) 55%
+  );
+}
+
+/* Animaciones suaves */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
+/* Barra de progreso de serie (Minimalista) */
+.progress-bar-glow {
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.35);
+}
+
+/* Badges y botones estilizados (Planos en lugar de gradientes agresivos) */
+.badge-movie {
+  background: #ea580c;
+}
+
+.badge-series {
+  background: #d97706;
+}
+
+/* Botón flotante pulsante (Más suave) */
+@keyframes pulse-subtle {
+  0%, 100% {
+    box-shadow: 0 0 10px rgba(245, 158, 11, 0.25);
+  }
+  50% {
+    box-shadow: 0 0 18px rgba(245, 158, 11, 0.5);
+  }
+}
+
+.pulse-glow {
+  animation: pulse-subtle 3s infinite;
+}
+
+/* Línea divisoria degradada */
+.section-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.06) 50%, transparent 100%);
+}
+
+/* Scrollbar delgado para listas de episodios y tabs */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: rgba(9, 12, 16, 0.4);
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: #272c35;
+  border-radius: 3px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: #f59e0b;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   REJILLA DE PÓSTERS
+   Columnas fluidas: el ancho de la tarjeta manda, no un número fijo
+   de columnas. Evita que en pantallas anchas las carátulas queden
+   diminutas y que en tablets sobre un hueco a la derecha.
+   ══════════════════════════════════════════════════════════════ */
+.poster-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+}
+
+@media (min-width: 640px) {
+  .poster-grid {
+    gap: 1.5rem;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  }
+}
+
+/* Foco visible con teclado: accesibilidad sin ensuciar el ratón */
+:focus-visible {
+  outline: 2px solid rgba(245, 158, 11, 0.85);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+/* La imagen del póster se aclara ligeramente al pasar por encima */
+.poster-card img {
+  filter: saturate(1.02);
+}
+
+/* Respeta a quien pide menos movimiento en su sistema */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .poster-card:hover {
+    transform: none;
+  }
+}
+
+/* Difuminado en el borde derecho: avisa de que quedan filtros
+   por ver al desplazar, solo donde la barra no cabe entera */
+@media (max-width: 860px) {
+  .scroll-fade {
+    -webkit-mask-image: linear-gradient(to right, #000 88%, transparent 100%);
+    mask-image: linear-gradient(to right, #000 88%, transparent 100%);
+  }
+}
+
+/* Utilidad usada en la barra de filtros de estado: oculta la barra de scroll
+   pero mantiene el desplazamiento horizontal */
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   AJUSTES PARA MÓVIL
+   ══════════════════════════════════════════════════════════════ */
+
+/* Respeta el notch y la barra de gestos en iPhone */
+body {
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+@media (max-width: 640px) {
+  /* Safari en iOS hace zoom al enfocar un campo con letra menor de 16px.
+     Se fuerza 16px solo en móvil para evitar ese salto molesto. */
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+
+  /* Áreas táctiles mínimas cómodas en los filtros y pestañas */
+  .status-tab-btn,
+  .type-tab-btn {
+    min-height: 38px;
+  }
+
+  /* Los modales se comportan como hojas inferiores: sin sombra lateral
+     y pegados al borde de la pantalla */
+  #searchModal .glass-panel,
+  #editModal .glass-panel,
+  #manualModal .glass-panel {
+    border-bottom: none;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* El aviso flotante no debe tapar la barra de gestos */
+  #toast {
+    bottom: calc(1rem + env(safe-area-inset-bottom));
+  }
+}
+
+/* En pantallas táctiles no hay puntero: se quitan los efectos de hover
+   que en móvil se quedaban "pegados" tras tocar una tarjeta */
+@media (hover: none) {
+  .poster-card:hover {
+    transform: none;
+    box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.4);
+    border-color: rgba(255, 255, 255, 0.04);
+  }
+
+  .poster-card:active {
+    transform: scale(0.985);
+  }
+
+  .group:hover .group-hover\:scale-105 {
+    transform: none;
+  }
+}

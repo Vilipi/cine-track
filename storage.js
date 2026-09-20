@@ -460,9 +460,11 @@ const STORAGE_SERVICE = {
   /**
    * Reinicia la biblioteca
    */
-  resetToDemo() {
-    this.saveItems(INITIAL_DEMO_ITEMS);
-    return INITIAL_DEMO_ITEMS;
+  clearAll() {
+    // Se guarda una lista vacía ("[]"), no se borra la clave: si faltara,
+    // getItems() lo tomaría por una primera ejecución y volvería a cargar los ejemplos
+    this.saveItems([]);
+    return [];
   }
 };
 

@@ -47,8 +47,8 @@
   add('menu.apiKey', 'Clave de TMDB', 'TMDB key', 'Klucz TMDB');
   add('menu.apiKeyNeeded', 'Necesaria para buscar películas', 'Required to search movies', 'Wymagany do wyszukiwania filmów');
   add('menu.apiKeySaved', 'Guardada en este dispositivo', 'Saved on this device', 'Zapisany na tym urządzeniu');
-  add('menu.reset', 'Restablecer Ejemplos', 'Reset examples', 'Przywróć przykłady');
-  add('menu.resetSub', 'Volver a los datos de prueba', 'Back to the sample data', 'Wróć do danych przykładowych');
+  add('menu.reset', 'Restablecer', 'Reset', 'Resetuj');
+  add('menu.resetSub', 'Vaciar la lista y empezar de cero', 'Clear the list and start fresh', 'Wyczyść listę i zacznij od nowa');
 
   // ───────────────────────────── Filtros y ordenación ─────────────────────────────
   add('tabs.all', 'Todo', 'All', 'Wszystko');
@@ -278,7 +278,7 @@
   add('toast.seasonUndone', 'Temporada {n} desmarcada', 'Season {n} unmarked', 'Sezon {n} odznaczony');
   add('toast.backupDownloaded', 'Copia de seguridad descargada en JSON.', 'Backup downloaded as JSON.', 'Kopia zapasowa pobrana jako JSON.');
   add('toast.importError', 'Error al importar archivo: {e}', 'Error importing file: {e}', 'Błąd importu pliku: {e}');
-  add('toast.resetDone', 'Lista restaurada a datos de ejemplo.', 'List restored to the sample data.', 'Lista przywrócona do danych przykładowych.');
+  add('toast.resetDone', 'Lista vaciada.', 'List cleared.', 'Lista wyczyszczona.');
   add('toast.offline', 'Sin conexión a internet', 'No internet connection', 'Brak połączenia z internetem');
   add('toast.lostConn', 'Se ha perdido la conexión a internet', 'The internet connection was lost', 'Utracono połączenie z internetem');
   add('toast.backOnline', 'Conexión restablecida', 'Connection restored', 'Połączenie przywrócone');
@@ -289,7 +289,10 @@
   add('toast.keyNone', 'No hay ninguna clave guardada', 'There is no saved key', 'Nie ma zapisanego klucza');
   add('toast.keyDeleted', 'Clave borrada de este dispositivo', 'Key deleted from this device', 'Klucz usunięty z tego urządzenia');
   add('confirm.delete', '¿Estás seguro de eliminar "{t}" de tu lista?', 'Are you sure you want to remove "{t}" from your list?', 'Czy na pewno chcesz usunąć „{t}” ze swojej listy?');
-  add('confirm.reset', '¿Deseas restaurar la lista con los ejemplos predeterminados? Tus cambios actuales se reemplazarán.', 'Do you want to restore the list with the default examples? Your current changes will be replaced.', 'Czy chcesz przywrócić listę z domyślnymi przykładami? Twoje bieżące zmiany zostaną zastąpione.');
+  add('confirm.reset',
+    '¿Seguro que quieres borrar toda tu lista? Se eliminarán todas las películas y series guardadas y no se puede deshacer.\n\nSi quieres conservarlas, cancela y usa antes "Descargar Copia".',
+    'Are you sure you want to delete your whole list? All saved movies and series will be removed and this cannot be undone.\n\nIf you want to keep them, cancel and use "Download backup" first.',
+    'Czy na pewno chcesz usunąć całą listę? Wszystkie zapisane filmy i seriale zostaną usunięte, a tej operacji nie można cofnąć.\n\nJeśli chcesz je zachować, anuluj i najpierw użyj „Pobierz kopię”.');
 
   add('storage.duplicate', 'Este título ya está en tu lista de seguimiento.', 'This title is already in your tracking list.', 'Ten tytuł jest już na Twojej liście śledzenia.');
   add('storage.badFormat', 'El formato debe ser una lista.', 'The format must be a list.', 'Format musi być listą.');

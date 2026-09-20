@@ -398,7 +398,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (barEl) barEl.classList.toggle('hidden', filtered.length === 0);
     if (selectEl) selectEl.classList.toggle('hidden', filtered.length === 0);
 
-    if (filtered.length === 0) return;
+    if (filtered.length === 0) {
+      state[stateKey] = 'all';
+      return;
+    }
 
     // Contar títulos por género. Los géneros conocidos se unifican entre idiomas
     // ("Ciencia Ficción" = "Science Fiction"); los personalizados se cuentan tal cual.
@@ -1595,7 +1598,9 @@ document.addEventListener('DOMContentLoaded', () => {
   DOM.resetDemoBtn.addEventListener('click', () => {
     closeOptionsMenu();
     if (confirm(t('confirm.reset'))) {
-      STORAGE_SERVICE.resetToDemo();
+      STORAGE_SERVICE.clearAll();
+      state.movieGenreFilter = 'all';
+      state.seriesGenreFilter = 'all';
       renderLibrary();
       showToast(t('toast.resetDone'));
     }

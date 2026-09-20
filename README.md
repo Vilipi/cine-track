@@ -25,7 +25,7 @@ La clave se almacena **solo en tu navegador** (`localStorage`). No está escrita
 - **Valoración personal** de 0 a 10, plataforma de streaming y notas.
 - **Filtros** por tipo, estado, género y búsqueda de texto sobre tu propia lista.
 - **Copias de seguridad**: exportar e importar toda la biblioteca en un archivo JSON.
-- **Datos de ejemplo** al abrirla por primera vez (Breaking Bad, Stranger Things, Interstellar y Dune: Parte 2), que puedes recuperar desde ⚙️ → *Restablecer Ejemplos*.
+- **Datos de ejemplo** al abrirla por primera vez (Breaking Bad, Stranger Things, Interstellar y Dune: Parte 2), que puedes borrar con ⚙️ → *Restablecer*, que deja la lista vacía (antes conviene descargar una copia). Restablecer no toca el idioma ni la clave de TMDB.
 - **Tres idiomas**: español, inglés y polaco. Se elige desde ⚙️ → *Idioma* (con banderas) y se recuerda en cada dispositivo. También cambia el idioma en que TMDB devuelve títulos y sinopsis.
 - **Diseño adaptado a móvil**, con modales a pantalla completa y áreas táctiles cómodas.
 

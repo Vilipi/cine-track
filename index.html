@@ -345,13 +345,16 @@
         </div>
 
         <!-- Barra interactiva de filtros de género para películas -->
-        <div id="movieGenreBar" class="mb-5 flex flex-wrap items-center gap-2 pb-1.5">
-          <div class="flex items-center gap-1.5 text-xs font-bold text-slate-400 uppercase tracking-wider shrink-0 w-full sm:w-auto mb-1 sm:mb-0 sm:mr-1">
+        <div id="movieGenreBar" class="mb-5 flex flex-col gap-2 pb-1.5">
+          <button id="toggleMovieGenresBtn" class="flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-orange-400 uppercase tracking-wider shrink-0 w-max mb-1 sm:mb-0 sm:mr-1 transition-colors cursor-pointer outline-none">
             <svg class="w-3.5 h-3.5 text-orange-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 6h16M4 12h10M4 18h6"/></svg>
-            <span>Género:</span>
-          </div>
-          <div id="movieGenrePills" class="flex items-center gap-1.5 flex-wrap">
-            <!-- Inyectado dinámicamente con JS -->
+            <span>Filtros por Género</span>
+            <svg id="movieGenreIcon" class="w-3.5 h-3.5 ml-1 transition-transform duration-300 -rotate-90" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          </button>
+          <div id="movieGenrePillsContainer" class="hidden">
+            <div id="movieGenrePills" class="flex items-center gap-1.5 flex-wrap">
+              <!-- Inyectado dinámicamente con JS -->
+            </div>
           </div>
         </div>
 
@@ -387,13 +390,16 @@
         </div>
 
         <!-- Barra interactiva de filtros de género para series -->
-        <div id="seriesGenreBar" class="mb-5 flex flex-wrap items-center gap-2 pb-1.5">
-          <div class="flex items-center gap-1.5 text-xs font-bold text-slate-400 uppercase tracking-wider shrink-0 w-full sm:w-auto mb-1 sm:mb-0 sm:mr-1">
+        <div id="seriesGenreBar" class="mb-5 flex flex-col gap-2 pb-1.5">
+          <button id="toggleSeriesGenresBtn" class="flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-amber-400 uppercase tracking-wider shrink-0 w-max mb-1 sm:mb-0 sm:mr-1 transition-colors cursor-pointer outline-none">
             <svg class="w-3.5 h-3.5 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 6h16M4 12h10M4 18h6"/></svg>
-            <span>Género:</span>
-          </div>
-          <div id="seriesGenrePills" class="flex items-center gap-1.5 flex-wrap">
-            <!-- Inyectado dinámicamente con JS -->
+            <span>Filtros por Género</span>
+            <svg id="seriesGenreIcon" class="w-3.5 h-3.5 ml-1 transition-transform duration-300 -rotate-90" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          </button>
+          <div id="seriesGenrePillsContainer" class="hidden">
+            <div id="seriesGenrePills" class="flex items-center gap-1.5 flex-wrap">
+              <!-- Inyectado dinámicamente con JS -->
+            </div>
           </div>
         </div>
 

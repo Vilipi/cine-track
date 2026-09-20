@@ -42,8 +42,14 @@ document.addEventListener('DOMContentLoaded', () => {
     viewOnlyMoviesBtn: document.getElementById('viewOnlyMoviesBtn'),
     movieGenreBar: document.getElementById('movieGenreBar'),
     movieGenrePills: document.getElementById('movieGenrePills'),
+    toggleMovieGenresBtn: document.getElementById('toggleMovieGenresBtn'),
+    movieGenrePillsContainer: document.getElementById('movieGenrePillsContainer'),
+    movieGenreIcon: document.getElementById('movieGenreIcon'),
     seriesGenreBar: document.getElementById('seriesGenreBar'),
     seriesGenrePills: document.getElementById('seriesGenrePills'),
+    toggleSeriesGenresBtn: document.getElementById('toggleSeriesGenresBtn'),
+    seriesGenrePillsContainer: document.getElementById('seriesGenrePillsContainer'),
+    seriesGenreIcon: document.getElementById('seriesGenreIcon'),
 
     catalogDivider: document.getElementById('catalogDivider'),
 
@@ -1741,10 +1747,25 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  // Toggle Genres UI
+  if (DOM.toggleMovieGenresBtn && DOM.movieGenrePillsContainer && DOM.movieGenreIcon) {
+    DOM.toggleMovieGenresBtn.addEventListener('click', () => {
+      DOM.movieGenrePillsContainer.classList.toggle('hidden');
+      DOM.movieGenreIcon.classList.toggle('-rotate-90');
+    });
+  }
+
+  if (DOM.toggleSeriesGenresBtn && DOM.seriesGenrePillsContainer && DOM.seriesGenreIcon) {
+    DOM.toggleSeriesGenresBtn.addEventListener('click', () => {
+      DOM.seriesGenrePillsContainer.classList.toggle('hidden');
+      DOM.seriesGenreIcon.classList.toggle('-rotate-90');
+    });
+  }
+
   // ==========================================
   // INICIALIZACIÓN
   // ==========================================
   renderLibrary();
   refreshApiKeyUI();
-});
 
+});

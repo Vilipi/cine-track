@@ -11,13 +11,15 @@
  * que los dispositivos descarten la copia antigua.
  */
 
-const CACHE_VERSION = 'cinetrack-v1';
+const CACHE_VERSION = 'cinetrack-v3';
 
 // Archivos propios de la app (no se cachean Tailwind, tipografías ni las APIs)
 const APP_SHELL = [
   './',
   './index.html',
   './styles.css',
+  './i18n.js',
+  './genres.js',
   './api.js',
   './storage.js',
   './app.js',

@@ -195,7 +195,7 @@ const STORAGE_SERVICE = {
     // Validar si ya existe
     const exists = items.some(i => i.title.toLowerCase() === item.title.toLowerCase() && i.type === item.type);
     if (exists) {
-      return { success: false, message: 'Este título ya está en tu lista de seguimiento.' };
+      return { success: false, message: t('storage.duplicate') };
     }
 
     const newItem = {
@@ -449,7 +449,7 @@ const STORAGE_SERVICE = {
   importData(jsonString) {
     try {
       const items = JSON.parse(jsonString);
-      if (!Array.isArray(items)) throw new Error('El formato debe ser una lista.');
+      if (!Array.isArray(items)) throw new Error(t('storage.badFormat'));
       this.saveItems(items);
       return { success: true, count: items.length };
     } catch (e) {

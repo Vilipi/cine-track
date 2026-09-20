@@ -19,14 +19,13 @@ const TMDB_KEY_STORAGE = 'cinetrack_tmdb_key';
 const API_SERVICE = {
   TMDB_BASE: 'https://api.themoviedb.org/3',
   TMDB_IMG: 'https://image.tmdb.org/t/p',
-  TMDB_LANG: 'es-ES',
-
   _tmdbGenreCache: null,
+  _tmdbGenreLang: null,
   _tmdbKeyWarned: false,
 
   // Limpia etiquetas HTML que TVMaze suele incluir en la sinopsis
   stripHtml(html) {
-    if (!html) return 'Sin descripción disponible.';
+    if (!html) return '';
     const tmp = document.createElement('DIV');
     tmp.innerHTML = html;
     return tmp.textContent || tmp.innerText || '';
@@ -34,9 +33,9 @@ const API_SERVICE = {
 
   // Generador de imagen placeholder SVG elegante cuando no hay póster
   getPlaceholderPoster(title, type = 'movie') {
-    const rawTitle = title || (type === 'movie' ? 'Película' : 'Serie');
+    const rawTitle = title || t(type === 'movie' ? 'type.movie' : 'type.series');
     const safeTitle = rawTitle.length > 22 ? rawTitle.substring(0, 20) + '...' : rawTitle;
-    const label = type === 'movie' ? 'PELÍCULA' : 'SERIE';
+    const label = t(type === 'movie' ? 'type.movie' : 'type.series').toLocaleUpperCase(I18N.locale);
     const bg = type === 'movie' ? '#ea580c' : '#f59e0b';
     const bgDark = type === 'movie' ? '#c2410c' : '#d97706';
 
@@ -147,7 +146,7 @@ const API_SERVICE = {
   tmdbUrl(path, params = {}) {
     const query = new URLSearchParams({
       api_key: this.getTmdbKey(),
-      language: this.TMDB_LANG,
+      language: I18N.locale,
       ...params
     });
     return `${this.TMDB_BASE}${path}?${query.toString()}`;
@@ -159,13 +158,15 @@ const API_SERVICE = {
 
   // Mapa id→nombre de géneros de películas (se pide una sola vez por sesión)
   async getTmdbMovieGenres() {
-    if (this._tmdbGenreCache) return this._tmdbGenreCache;
+    const lang = I18N.lang;
+    if (this._tmdbGenreCache && this._tmdbGenreLang === lang) return this._tmdbGenreCache;
     try {
       const data = await this.fetchJson(this.tmdbUrl('/genre/movie/list'), { timeout: 6000 });
       this._tmdbGenreCache = new Map((data.genres || []).map(g => [g.id, g.name]));
     } catch (error) {
       this._tmdbGenreCache = new Map();
     }
+    this._tmdbGenreLang = lang;
     return this._tmdbGenreCache;
   },
 
@@ -288,9 +289,9 @@ const API_SERVICE = {
         poster: poster || this.getPlaceholderPoster(movie.title, 'movie'),
         backdrop: this.tmdbImage(movie.backdrop_path, 'w1280') || poster,
         year: movie.release_date ? movie.release_date.substring(0, 4) : 'N/A',
-        genres: genres.length ? genres : ['Cine'],
+        genres: genres.length ? genres : [t('genre.defaultMovie')],
         status: detail?.status || 'Released',
-        summary: movie.overview || detail?.overview || 'Sin descripción disponible.',
+        summary: movie.overview || detail?.overview || '',
         rating: movie.vote_average ? Number(movie.vote_average).toFixed(1) : null,
         director: director,
         cast: cast,
@@ -327,9 +328,9 @@ const API_SERVICE = {
           poster: poster || this.getPlaceholderPoster(show.name, 'series'),
           backdrop: this.tmdbImage(show.backdrop_path, 'w1280') || poster,
           year: show.first_air_date ? show.first_air_date.substring(0, 4) : 'N/A',
-          genres: [],
+          genres: GENRES.fromTmdbTv(show.genre_ids),
           status: 'Unknown',
-          summary: show.overview || 'Sin descripción disponible.',
+          summary: show.overview || '',
           rating: show.vote_average ? Number(show.vote_average).toFixed(1) : null,
           duration: null,
           episodeDuration: 45,

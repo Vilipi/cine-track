@@ -26,6 +26,7 @@ La clave se almacena **solo en tu navegador** (`localStorage`). No está escrita
 - **Filtros** por tipo, estado, género y búsqueda de texto sobre tu propia lista.
 - **Copias de seguridad**: exportar e importar toda la biblioteca en un archivo JSON.
 - **Datos de ejemplo** al abrirla por primera vez (Breaking Bad, Stranger Things, Interstellar y Dune: Parte 2), que puedes recuperar desde ⚙️ → *Restablecer Ejemplos*.
+- **Tres idiomas**: español, inglés y polaco. Se elige desde ⚙️ → *Idioma* (con banderas) y se recuerda en cada dispositivo. También cambia el idioma en que TMDB devuelve títulos y sinopsis.
 - **Diseño adaptado a móvil**, con modales a pantalla completa y áreas táctiles cómodas.
 
 ---
@@ -52,6 +53,16 @@ Queda un icono propio en el escritorio y la app arranca a pantalla completa, sin
 de direcciones del navegador. Necesita conexión para buscar en TMDB y TVMaze; si se cae,
 avisa con un mensaje en lugar de quedarse colgada. Tu biblioteca ya guardada se ve igual.
 
+### 🌍 Añadir o corregir traducciones
+
+Todos los textos viven en [`i18n.js`](i18n.js), una línea por texto con sus tres idiomas:
+
+```js
+add('menu.export', 'Descargar Copia', 'Download backup', 'Pobierz kopię');
+```
+
+Los textos del HTML llevan `data-i18n="clave"`; los que genera `app.js` usan `t('clave')`, o `tp('clave', n)` cuando dependen de una cantidad (el polaco tiene tres formas plurales). Los **géneros estándar** (los de TMDB y TVMaze) se reconocen en cualquiera de los tres idiomas y se muestran en el idioma activo; además, "Ciencia Ficción", "Science Fiction" y "Science-Fiction" cuentan como un solo filtro. La tabla está en [`genres.js`](genres.js). Los **géneros personalizados** que escribas tú nunca se traducen. Tampoco se traducen tus títulos, notas ni las sinopsis ya descargadas: se muestran tal como los guardaste.
+
 ---
 
 ## 🗂️ Estructura
@@ -60,6 +71,8 @@ avisa con un mensaje en lugar de quedarse colgada. Tu biblioteca ya guardada se 
 |---|---|
 | `index.html` | Estructura de la interfaz y modales |
 | `styles.css` | Estilos propios, rejilla de pósters y ajustes de móvil |
+| `i18n.js` | Traducciones (es / en / pl), plurales y cambio de idioma |
+| `genres.js` | Tabla de géneros conocidos y sus nombres en los tres idiomas |
 | `api.js` | Integración con TMDB y TVMaze, y gestión de la clave |
 | `storage.js` | Persistencia en `localStorage`, datos de ejemplo y copias de seguridad |
 | `app.js` | Lógica de interfaz: renderizado, filtros, modales y eventos |

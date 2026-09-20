@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
     statusFilter: 'all',        // 'all', 'watching', 'plan_to_watch', 'completed', 'favorites'
     movieGenreFilter: 'all',    // 'all' o un género específico como 'Ciencia Ficción'
     seriesGenreFilter: 'all',   // igual que movieGenreFilter, pero para series
+    customGenreNames: {},       // identificador -> texto original de cada género personalizado
     searchFilter: '',           // Filtro de texto en la biblioteca guardada
     sortBy: 'recent',           // recent, rating, title, year
     apiSearchResults: [],       // Resultados temporales de búsqueda en APIs
@@ -109,6 +110,37 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   // ==========================================
+  // TEXTOS DE DATOS GUARDADOS
+  // ==========================================
+  // Las fichas guardadas antes de existir el selector de idioma pueden llevar
+  // el aviso de "sin sinopsis" o nombres genéricos de episodio en español:
+  // se reconocen y se muestran en el idioma activo.
+  const LEGACY_NO_SYNOPSIS = ['Sin descripción disponible.', 'Sin sinopsis disponible.'];
+
+  function getSummary(item) {
+    const text = ((item && item.summary) || '').trim();
+    return (!text || LEGACY_NO_SYNOPSIS.includes(text)) ? t('detail.noSynopsis') : text;
+  }
+
+  // Los filtros de género usan un identificador: los géneros conocidos se unifican
+  // entre idiomas ("k:scifi"); los personalizados se distinguen por su texto ("c:...").
+  function genreName(identity) {
+    const known = GENRES.labelForIdentity(identity);
+    if (known) return known;
+    return state.customGenreNames[identity] || String(identity).slice(2);
+  }
+
+  function itemHasGenre(item, identity) {
+    return Array.isArray(item.genres) && item.genres.some(g => GENRES.identity(g) === identity);
+  }
+
+  function episodeName(ep) {
+    const name = ((ep && ep.name) || '').trim();
+    if (!name || /^(Cap[ií]tulo|Episodio) \d+$/.test(name)) return t('ep.default', { n: ep.number });
+    return name;
+  }
+
+  // ==========================================
   // NOTIFICACIONES TOAST
   // ==========================================
   function showToast(message, type = 'success') {
@@ -157,7 +189,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const q = state.searchFilter.toLowerCase();
       filteredItems = filteredItems.filter(i => 
         i.title.toLowerCase().includes(q) || 
-        (i.genres && i.genres.some(g => g.toLowerCase().includes(q))) ||
+        (i.genres && i.genres.some(g => g.toLowerCase().includes(q) || GENRES.label(g).toLowerCase().includes(q))) ||
         (i.platform && i.platform.toLowerCase().includes(q))
       );
     }
@@ -166,7 +198,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const sortFn = (a, b) => {
       if (state.sortBy === 'recent') return (b.createdAt || 0) - (a.createdAt || 0);
       if (state.sortBy === 'rating') return (b.userRating || 0) - (a.userRating || 0);
-      if (state.sortBy === 'title') return a.title.localeCompare(b.title);
+      if (state.sortBy === 'title') return a.title.localeCompare(b.title, I18N.locale);
       if (state.sortBy === 'year') return (b.year || '').localeCompare(a.year || '');
       return 0;
     };
@@ -204,20 +236,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const isGenreActive = state.movieGenreFilter && state.movieGenreFilter !== 'all';
     let displayedMovies = moviesList;
     if (isGenreActive) {
-      const gTarget = state.movieGenreFilter.toLowerCase();
-      displayedMovies = moviesList.filter(m =>
-        m.genres && m.genres.some(g => g.toLowerCase() === gTarget)
-      );
+      displayedMovies = moviesList.filter(m => itemHasGenre(m, state.movieGenreFilter));
     }
 
     // Filtrar series por género si está activo
     const isSeriesGenreActive = state.seriesGenreFilter && state.seriesGenreFilter !== 'all';
     let displayedSeries = seriesList;
     if (isSeriesGenreActive) {
-      const gTarget = state.seriesGenreFilter.toLowerCase();
-      displayedSeries = seriesList.filter(sItem =>
-        sItem.genres && sItem.genres.some(g => g.toLowerCase() === gTarget)
-      );
+      displayedSeries = seriesList.filter(sItem => itemHasGenre(sItem, state.seriesGenreFilter));
     }
 
     // Determinar qué secciones mostrar según el filtro de tipo
@@ -236,14 +262,14 @@ document.addEventListener('DOMContentLoaded', () => {
       if (DOM.emptyState) DOM.emptyState.classList.remove('hidden');
 
       if (state.typeFilter === 'movie') {
-        if (DOM.emptyStateTitle) DOM.emptyStateTitle.textContent = 'No hay películas en esta vista';
-        if (DOM.emptyStateDesc) DOM.emptyStateDesc.textContent = 'Prueba con otro estado o busca películas en la API para agregarlas.';
+        if (DOM.emptyStateTitle) DOM.emptyStateTitle.textContent = t('empty.movies.title');
+        if (DOM.emptyStateDesc) DOM.emptyStateDesc.textContent = t('empty.movies.desc');
       } else if (state.typeFilter === 'series') {
-        if (DOM.emptyStateTitle) DOM.emptyStateTitle.textContent = 'No hay series en esta vista';
-        if (DOM.emptyStateDesc) DOM.emptyStateDesc.textContent = 'Prueba con otro estado o busca series en la API para llevar su seguimiento.';
+        if (DOM.emptyStateTitle) DOM.emptyStateTitle.textContent = t('empty.series.title');
+        if (DOM.emptyStateDesc) DOM.emptyStateDesc.textContent = t('empty.series.desc');
       } else {
-        if (DOM.emptyStateTitle) DOM.emptyStateTitle.textContent = 'No se encontraron resultados';
-        if (DOM.emptyStateDesc) DOM.emptyStateDesc.textContent = 'Prueba a cambiar los filtros o realiza una búsqueda en la API.';
+        if (DOM.emptyStateTitle) DOM.emptyStateTitle.textContent = t('empty.all.title');
+        if (DOM.emptyStateDesc) DOM.emptyStateDesc.textContent = t('empty.all.desc');
       }
       return;
     }
@@ -255,14 +281,14 @@ document.addEventListener('DOMContentLoaded', () => {
       DOM.seriesSection.classList.remove('hidden');
       if (DOM.seriesCountBadge) {
         DOM.seriesCountBadge.textContent = isSeriesGenreActive
-          ? `${displayedSeries.length} de ${seriesList.length} (${state.seriesGenreFilter})`
-          : `${seriesList.length} serie${seriesList.length === 1 ? '' : 's'}`;
+          ? t('section.genreCount', { a: displayedSeries.length, b: seriesList.length, genre: genreName(state.seriesGenreFilter) })
+          : tp('count.series', seriesList.length);
       }
       if (DOM.seriesSectionSub) {
         const epWatched = displayedSeries.reduce((acc, s) => acc + (s.currentEpisode || 0), 0);
-        DOM.seriesSectionSub.textContent = isSeriesGenreActive
-          ? `${displayedSeries.length} serie${displayedSeries.length === 1 ? '' : 's'} de ${state.seriesGenreFilter} • ${epWatched} episodios vistos`
-          : `${seriesList.length} en seguimiento • ${epWatched} episodios vistos`;
+        DOM.seriesSectionSub.textContent = (isSeriesGenreActive
+          ? tp('series.ofGenre', displayedSeries.length, { genre: genreName(state.seriesGenreFilter) })
+          : t('series.tracking', { n: seriesList.length })) + ' • ' + tp('count.episodesWatched', epWatched);
       }
       if (DOM.viewOnlySeriesBtn) {
         DOM.viewOnlySeriesBtn.classList.toggle('hidden', state.typeFilter === 'series');
@@ -273,10 +299,10 @@ document.addEventListener('DOMContentLoaded', () => {
         DOM.seriesGrid.innerHTML = `
           <div class="col-span-full py-12 text-center text-slate-400 bg-slate-900/40 rounded-2xl border border-slate-800/80 p-6">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10 mx-auto mb-2 text-amber-400/60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
-            <p class="font-bold text-white text-sm">No hay series del género "${state.seriesGenreFilter}"</p>
-            <p class="text-xs text-slate-500 mt-1">Prueba a seleccionar otro género o restablecer el filtro.</p>
+            <p class="font-bold text-white text-sm">${t('genre.emptySeries', { genre: genreName(state.seriesGenreFilter) })}</p>
+            <p class="text-xs text-slate-500 mt-1">${t('genre.emptyHint')}</p>
             <button id="resetSeriesGenreBtn" class="mt-3.5 text-xs font-bold px-4 py-2 rounded-xl bg-amber-500 text-slate-950 hover:bg-amber-400 transition-all shadow-md shadow-amber-500/20 cursor-pointer">
-              Ver todos los géneros
+              ${t('genre.viewAll')}
             </button>
           </div>
         `;
@@ -306,8 +332,8 @@ document.addEventListener('DOMContentLoaded', () => {
       DOM.moviesSection.classList.remove('hidden');
       if (DOM.moviesCountBadge) {
         DOM.moviesCountBadge.textContent = isGenreActive
-          ? `${displayedMovies.length} de ${moviesList.length} (${state.movieGenreFilter})`
-          : `${moviesList.length} película${moviesList.length === 1 ? '' : 's'}`;
+          ? t('section.genreCount', { a: displayedMovies.length, b: moviesList.length, genre: genreName(state.movieGenreFilter) })
+          : tp('count.movies', moviesList.length);
       }
       if (DOM.moviesSectionSub) {
         let totalMins = 0;
@@ -318,10 +344,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (match) totalMins += parseInt(match[1], 10);
           }
         });
-        const hoursPart = totalMins > 0 ? ` • ${Math.round(totalMins / 60)}h ${totalMins % 60}m de metraje` : '';
-        DOM.moviesSectionSub.textContent = isGenreActive
-          ? `${displayedMovies.length} película${displayedMovies.length === 1 ? '' : 's'} de ${state.movieGenreFilter}${hoursPart}`
-          : `${moviesList.length} largometraje${moviesList.length === 1 ? '' : 's'}${hoursPart}`;
+        const hoursPart = totalMins > 0 ? ' • ' + t('movies.runtime', { h: Math.round(totalMins / 60), m: totalMins % 60 }) : '';
+        DOM.moviesSectionSub.textContent = (isGenreActive
+          ? tp('movies.ofGenre', displayedMovies.length, { genre: genreName(state.movieGenreFilter) })
+          : tp('count.features', moviesList.length)) + hoursPart;
       }
       if (DOM.viewOnlyMoviesBtn) {
         DOM.viewOnlyMoviesBtn.classList.toggle('hidden', state.typeFilter === 'movie');
@@ -332,10 +358,10 @@ document.addEventListener('DOMContentLoaded', () => {
         DOM.moviesGrid.innerHTML = `
           <div class="col-span-full py-12 text-center text-slate-400 bg-slate-900/40 rounded-2xl border border-slate-800/80 p-6">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10 mx-auto mb-2 text-orange-400/60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
-            <p class="font-bold text-white text-sm">No hay películas del género "${state.movieGenreFilter}"</p>
-            <p class="text-xs text-slate-500 mt-1">Prueba a seleccionar otro género o restablecer el filtro.</p>
+            <p class="font-bold text-white text-sm">${t('genre.emptyMovies', { genre: genreName(state.movieGenreFilter) })}</p>
+            <p class="text-xs text-slate-500 mt-1">${t('genre.emptyHint')}</p>
             <button id="resetMovieGenreBtn" class="mt-3.5 text-xs font-bold px-4 py-2 rounded-xl bg-orange-500 text-slate-950 hover:bg-orange-400 transition-all shadow-md shadow-orange-500/20 cursor-pointer">
-              Ver todos los géneros
+              ${t('genre.viewAll')}
             </button>
           </div>
         `;
@@ -374,15 +400,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (filtered.length === 0) return;
 
-    // Calcular recuentos de géneros
+    // Contar títulos por género. Los géneros conocidos se unifican entre idiomas
+    // ("Ciencia Ficción" = "Science Fiction"); los personalizados se cuentan tal cual.
     const genreCounts = {};
     filtered.forEach(m => {
       if (m.genres && Array.isArray(m.genres)) {
+        const countedInItem = new Set();
         m.genres.forEach(g => {
-          const clean = g.trim();
-          if (clean) {
-            genreCounts[clean] = (genreCounts[clean] || 0) + 1;
-          }
+          const clean = String(g).trim();
+          if (!clean) return;
+          const id = GENRES.identity(clean);
+          if (countedInItem.has(id)) return;
+          countedInItem.add(id);
+          genreCounts[id] = (genreCounts[id] || 0) + 1;
+          if (id.startsWith('c:') && !state.customGenreNames[id]) state.customGenreNames[id] = clean;
         });
       }
     });
@@ -392,17 +423,17 @@ document.addEventListener('DOMContentLoaded', () => {
     // 1. Selector Dropdown en barra superior (solo lo tienen las películas)
     if (selectEl) {
       const currentSelected = state[stateKey] || 'all';
-      selectEl.innerHTML = `<option value="all">Género: Todos (${filtered.length})</option>`;
-      uniqueGenres.forEach(g => {
+      selectEl.innerHTML = `<option value="all">${t('genre.selectAll', { n: filtered.length })}</option>`;
+      uniqueGenres.forEach(id => {
         const opt = document.createElement('option');
-        opt.value = g;
-        opt.textContent = `${g} (${genreCounts[g]})`;
-        if (g.toLowerCase() === currentSelected.toLowerCase()) {
+        opt.value = id;
+        opt.textContent = `${genreName(id)} (${genreCounts[id]})`;
+        if (id === currentSelected) {
           opt.selected = true;
         }
         selectEl.appendChild(opt);
       });
-      if (currentSelected !== 'all' && !uniqueGenres.some(g => g.toLowerCase() === currentSelected.toLowerCase())) {
+      if (currentSelected !== 'all' && !uniqueGenres.includes(currentSelected)) {
         state[stateKey] = 'all';
         selectEl.value = 'all';
       }
@@ -417,7 +448,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const allPill = document.createElement('button');
       allPill.type = 'button';
       allPill.className = isAll ? activePillClass : inactivePillClass;
-      allPill.innerHTML = `<span>Todos</span><span class="text-[10px] font-bold opacity-80 ${isAll ? 'bg-slate-950/20' : 'bg-black/30'} px-1.5 py-0.5 rounded-full">${filtered.length}</span>`;
+      allPill.innerHTML = `<span>${t('genre.all')}</span><span class="text-[10px] font-bold opacity-80 ${isAll ? 'bg-slate-950/20' : 'bg-black/30'} px-1.5 py-0.5 rounded-full">${filtered.length}</span>`;
       allPill.addEventListener('click', () => {
         state[stateKey] = 'all';
         if (selectEl) selectEl.value = 'all';
@@ -426,14 +457,14 @@ document.addEventListener('DOMContentLoaded', () => {
       pillsEl.appendChild(allPill);
 
       // Pills individuales, una por cada género distinto encontrado
-      uniqueGenres.forEach(g => {
-        const isActive = state[stateKey] && state[stateKey].toLowerCase() === g.toLowerCase();
+      uniqueGenres.forEach(id => {
+        const isActive = state[stateKey] === id;
         const pill = document.createElement('button');
         pill.type = 'button';
         pill.className = isActive ? activePillClass : inactivePillClass;
-        pill.innerHTML = `<span>${g}</span><span class="text-[10px] font-bold opacity-80 ${isActive ? 'bg-slate-950/20' : 'bg-black/30'} px-1.5 py-0.5 rounded-full">${genreCounts[g]}</span>`;
+        pill.innerHTML = `<span>${genreName(id)}</span><span class="text-[10px] font-bold opacity-80 ${isActive ? 'bg-slate-950/20' : 'bg-black/30'} px-1.5 py-0.5 rounded-full">${genreCounts[id]}</span>`;
         pill.addEventListener('click', () => {
-          state[stateKey] = isActive ? 'all' : g;
+          state[stateKey] = isActive ? 'all' : id;
           if (selectEl) selectEl.value = state[stateKey];
           renderLibrary();
         });
@@ -454,16 +485,16 @@ document.addEventListener('DOMContentLoaded', () => {
       : 'poster-card card-series group rounded-2xl overflow-hidden bg-slate-900/90 flex flex-col cursor-pointer border border-slate-800/80 hover:border-indigo-500/45 transition-all';
 
     // Etiqueta y color según estado
-    let statusLabel = 'Por Ver';
+    let statusLabel = t('card.status.plan');
     let statusBg = 'bg-amber-500/20 text-amber-300 border-amber-500/30';
     if (item.status === 'watching') {
-      statusLabel = 'Viendo';
+      statusLabel = t('card.status.watching');
       statusBg = 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30';
     } else if (item.status === 'completed') {
-      statusLabel = 'Completado';
+      statusLabel = t('card.status.completed');
       statusBg = 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30';
     } else if (item.status === 'on_hold') {
-      statusLabel = 'En Pausa';
+      statusLabel = t('card.status.onHold');
       statusBg = 'bg-rose-500/20 text-rose-300 border-rose-500/30';
     }
 
@@ -480,7 +511,7 @@ document.addEventListener('DOMContentLoaded', () => {
       progressHtml = `
         <div class="mt-2.5">
           <div class="flex justify-between items-center text-[11px] text-slate-400 mb-1 font-medium">
-            <span>Temp. ${item.currentSeason || 1} • Cap. ${currentEp}/${totalEp}</span>
+            <span>${t('card.progress', { s: item.currentSeason || 1, c: currentEp, t: totalEp })}</span>
             <span class="text-amber-400 font-bold">${percent}%</span>
           </div>
           <div class="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
@@ -492,10 +523,10 @@ document.addEventListener('DOMContentLoaded', () => {
       quickActionBtn = `
         <button 
           data-quick-ep="${item.id}" 
-          title="Avanzar +1 episodio visto"
+          title="${t('card.nextEpTitle')}"
           class="text-[11px] bg-amber-500/15 hover:bg-amber-500 text-amber-300 hover:text-slate-950 font-bold px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 border border-amber-500/30 hover:scale-105 active:scale-95">
           <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-          <span>+1 Ep</span>
+          <span>${t('card.nextEp')}</span>
         </button>
       `;
     } else {
@@ -504,10 +535,10 @@ document.addEventListener('DOMContentLoaded', () => {
       quickActionBtn = `
         <button 
           data-quick-movie="${item.id}"
-          title="${isCompleted ? 'Marcar como pendiente' : 'Marcar como completada'}"
+          title="${isCompleted ? t('card.markPendingTitle') : t('card.markDoneTitle')}"
           class="text-[11px] font-semibold px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 ${isCompleted ? 'bg-emerald-600/20 text-emerald-300 border border-emerald-500/30' : 'bg-orange-500/15 hover:bg-orange-500 text-orange-300 hover:text-white border border-orange-500/30 hover:scale-105 active:scale-95'}">
           <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
-          <span>${isCompleted ? 'Vista' : 'Marcar'}</span>
+          <span>${isCompleted ? t('card.watched') : t('card.mark')}</span>
         </button>
       `;
     }
@@ -527,7 +558,7 @@ document.addEventListener('DOMContentLoaded', () => {
       </span>
     ` : '';
 
-    const safeTitle = (item.title || 'Título').replace(/"/g, '&quot;');
+    const safeTitle = (item.title || t('card.titleFallback')).replace(/"/g, '&quot;');
     const posterSrc = item.poster || API_SERVICE.getPlaceholderPoster(item.title, item.type);
 
     card.innerHTML = `
@@ -545,14 +576,14 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="absolute top-2.5 left-2.5 right-2.5 flex justify-between items-center pointer-events-none">
           <span class="text-[10px] font-bold uppercase tracking-wider text-white px-2 py-0.5 rounded-md shadow-md ${isMovie ? 'badge-movie' : 'badge-series'} flex items-center gap-1">
             ${isMovie 
-              ? `<svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect><line x1="7" y1="2" x2="7" y2="22"></line><line x1="17" y1="2" x2="17" y2="22"></line></svg><span>Película</span>` 
-              : `<svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect><polyline points="17 2 12 7 7 2"></polyline></svg><span>Serie</span>`
+              ? `<svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect><line x1="7" y1="2" x2="7" y2="22"></line><line x1="17" y1="2" x2="17" y2="22"></line></svg><span>${t('type.movie')}</span>` 
+              : `<svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect><polyline points="17 2 12 7 7 2"></polyline></svg><span>${t('type.series')}</span>`
             }
           </span>
           <button 
             data-favorite="${item.id}" 
             class="pointer-events-auto p-1.5 rounded-full bg-black/40 hover:bg-black/80 backdrop-blur-md text-white transition-all transform hover:scale-110 active:scale-95"
-            title="${item.favorite ? 'Quitar de favoritos' : 'Marcar favorito'}">
+            title="${item.favorite ? t('card.favRemove') : t('card.favAdd')}">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 ${item.favorite ? 'fill-rose-500 text-rose-500' : 'text-slate-300'}" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none">
               <path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
             </svg>
@@ -585,9 +616,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 <button 
                   type="button" 
                   data-genre-click="${g}" 
-                  title="${isMovie ? `Filtrar películas por ${g}` : g}"
+                  title="${isMovie ? t('card.filterMovies', { g: GENRES.label(g) }) : GENRES.label(g)}"
                   class="text-[10px] font-semibold text-slate-400 hover:text-orange-300 hover:bg-orange-500/15 px-1.5 py-0.5 rounded bg-slate-800/60 border border-slate-700/50 transition-all cursor-pointer">
-                  ${g}
+                  ${GENRES.label(g)}
                 </button>
               `).join('')}
             </div>
@@ -600,7 +631,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="mt-3 pt-2.5 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2">
             <div class="flex items-center gap-1.5">
               ${starsHtml}
-              ${!item.userRating ? '<span class="text-xs text-slate-500 italic">Sin calificar</span>' : ''}
+              ${!item.userRating ? `<span class="text-xs text-slate-500 italic">${t('card.unrated')}</span>` : ''}
             </div>
             <div>
               ${quickActionBtn}
@@ -618,14 +649,14 @@ document.addEventListener('DOMContentLoaded', () => {
         e.stopPropagation();
         const genre = genreBtn.getAttribute('data-genre-click');
         if (isMovie) {
-          state.movieGenreFilter = genre;
+          state.movieGenreFilter = GENRES.identity(genre);
           if (state.typeFilter === 'series') state.typeFilter = 'all';
-          if (DOM.movieGenreSelect) DOM.movieGenreSelect.value = genre;
-          showToast(`Filtrando películas por género: "${genre}"`);
+          if (DOM.movieGenreSelect) DOM.movieGenreSelect.value = state.movieGenreFilter;
+          showToast(t('toast.genreMovies', { g: GENRES.label(genre) }));
         } else {
-          state.seriesGenreFilter = genre;
+          state.seriesGenreFilter = GENRES.identity(genre);
           if (state.typeFilter === 'movie') state.typeFilter = 'all';
-          showToast(`Filtrando series por género: "${genre}"`);
+          showToast(t('toast.genreSeries', { g: GENRES.label(genre) }));
         }
         renderLibrary();
         return;
@@ -637,7 +668,7 @@ document.addEventListener('DOMContentLoaded', () => {
         e.stopPropagation();
         STORAGE_SERVICE.toggleFavorite(item.id);
         renderLibrary();
-        showToast(item.favorite ? `"${item.title}" quitado de favoritos` : `"${item.title}" añadido a favoritos!`);
+        showToast(item.favorite ? t('toast.favRemoved', { t: item.title }) : t('toast.favAdded', { t: item.title }));
         return;
       }
 
@@ -647,7 +678,7 @@ document.addEventListener('DOMContentLoaded', () => {
         e.stopPropagation();
         const updated = STORAGE_SERVICE.incrementEpisode(item.id);
         renderLibrary();
-        showToast(`Episodio ${updated.currentEpisode} registrado para "${item.title}"`);
+        showToast(t('toast.epLogged', { n: updated.currentEpisode, t: item.title }));
         return;
       }
 
@@ -658,7 +689,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const newStatus = item.status === 'completed' ? 'plan_to_watch' : 'completed';
         STORAGE_SERVICE.updateItem(item.id, { status: newStatus });
         renderLibrary();
-        showToast(newStatus === 'completed' ? `¡"${item.title}" marcada como vista!` : `"${item.title}" marcada como pendiente`);
+        showToast(newStatus === 'completed' ? t('toast.markedDone', { t: item.title }) : t('toast.markedPending', { t: item.title }));
         return;
       }
 
@@ -683,8 +714,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (DOM.apiKeyMenuState) {
       DOM.apiKeyMenuState.textContent = hasKey
-        ? 'Guardada en este dispositivo'
-        : 'Necesaria para buscar películas';
+        ? t('menu.apiKeySaved')
+        : t('menu.apiKeyNeeded');
       DOM.apiKeyMenuState.className = hasKey
         ? 'text-[10px] text-emerald-400/90 block'
         : 'text-[10px] text-amber-400/90 block';
@@ -692,8 +723,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (DOM.apiKeyStatus) {
       DOM.apiKeyStatus.textContent = hasKey
-        ? `Clave guardada (termina en …${key.slice(-4)})`
-        : 'Sin clave guardada';
+        ? t('apiKey.statusSaved', { last: key.slice(-4) })
+        : t('apiKey.statusNone');
       DOM.apiKeyStatus.className = hasKey
         ? 'text-[11px] font-semibold text-emerald-300'
         : 'text-[11px] font-semibold text-slate-400';
@@ -729,18 +760,18 @@ document.addEventListener('DOMContentLoaded', () => {
           <line x1="1" y1="1" x2="23" y2="23"></line>
           <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55M5 12.55a10.94 10.94 0 0 1 5.17-2.39M10.71 5.05A16 16 0 0 1 22.58 9M1.42 9a15.91 15.91 0 0 1 4.7-2.88M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"></path>
         </svg>
-        <p class="font-semibold text-slate-300">Sin conexión a internet</p>
-        <p class="text-xs text-slate-500 mt-1">El buscador necesita conexión para consultar TMDB y TVMaze.<br>Tu biblioteca guardada sigue disponible.</p>
+        <p class="font-semibold text-slate-300">${t('offline.title')}</p>
+        <p class="text-xs text-slate-500 mt-1">${t('offline.desc1')}<br>${t('offline.desc2')}</p>
       </div>
     `;
   }
 
   window.addEventListener('offline', () => {
-    showToast('Se ha perdido la conexión a internet', 'error');
+    showToast(t('toast.lostConn'), 'error');
   });
 
   window.addEventListener('online', () => {
-    showToast('Conexión restablecida');
+    showToast(t('toast.backOnline'));
     // Si el buscador está abierto con texto, se repite la búsqueda
     if (DOM.searchModal && !DOM.searchModal.classList.contains('hidden') && DOM.apiSearchInput.value.trim()) {
       handleApiSearch();
@@ -780,7 +811,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (navigator.onLine === false) {
       DOM.apiSearchLoading.classList.add('hidden');
       DOM.apiSearchResults.innerHTML = offlineNoticeHtml();
-      showToast('Sin conexión a internet', 'error');
+      showToast(t('toast.offline'), 'error');
       return;
     }
 
@@ -794,18 +825,18 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="sm:col-span-2 flex items-start gap-3 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30">
           <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-amber-400 shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
           <div class="min-w-0 flex-grow">
-            <p class="text-xs font-semibold text-amber-200">Solo se están buscando series</p>
-            <p class="text-[11px] text-amber-200/70 mt-0.5">Añade tu clave gratuita de TMDB para que aparezcan también las películas.</p>
+            <p class="text-xs font-semibold text-amber-200">${t('keyNotice.title')}</p>
+            <p class="text-[11px] text-amber-200/70 mt-0.5">${t('keyNotice.desc')}</p>
           </div>
           <button type="button" data-open-api-key class="text-[11px] font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 px-3 py-1.5 rounded-lg shrink-0 transition-all">
-            Añadir
+            ${t('action.add')}
           </button>
         </div>
       ` : '';
 
       if (results.length === 0 && navigator.onLine === false) {
         DOM.apiSearchResults.innerHTML = offlineNoticeHtml();
-        showToast('Sin conexión a internet', 'error');
+        showToast(t('toast.offline'), 'error');
         return;
       }
 
@@ -813,8 +844,8 @@ document.addEventListener('DOMContentLoaded', () => {
         DOM.apiSearchResults.innerHTML = keyNotice + `
           <div class="col-span-full py-12 text-center text-slate-400">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-12 h-12 mx-auto mb-3 text-slate-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-            <p class="font-medium text-slate-300">No encontramos resultados para "${query}"</p>
-            <p class="text-xs text-slate-500 mt-1">Prueba con otro título o cambia el filtro de Series/Películas.</p>
+            <p class="font-medium text-slate-300">${t('search.noResults', { q: query })}</p>
+            <p class="text-xs text-slate-500 mt-1">${t('search.noResultsHint')}</p>
           </div>
         `;
         return;
@@ -827,7 +858,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const resultCard = document.createElement('div');
         resultCard.className = 'flex gap-3.5 p-3 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 hover:border-amber-500/50 transition-all items-start';
 
-        const safeTitle = (item.title || 'Título').replace(/"/g, '&quot;');
+        const safeTitle = (item.title || t('card.titleFallback')).replace(/"/g, '&quot;');
         const posterSrc = item.poster || API_SERVICE.getPlaceholderPoster(item.title, item.type);
 
         resultCard.innerHTML = `
@@ -840,37 +871,37 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="flex-grow min-w-0">
             <div class="flex items-center gap-2">
               <span class="text-[10px] font-bold uppercase tracking-wider text-white px-1.5 py-0.5 rounded ${item.type === 'movie' ? 'badge-movie' : 'badge-series'}">
-                ${item.type === 'movie' ? 'Película' : 'Serie'}
+                ${item.type === 'movie' ? t('type.movie') : t('type.series')}
               </span>
               <span class="text-xs text-slate-400 font-medium">${item.year || ''}</span>
               ${item.duration ? `<span class="text-xs text-slate-400 font-medium">• ${item.duration}</span>` : ''}
             </div>
             <h4 class="font-bold text-white text-sm line-clamp-1 mt-1">${item.title}</h4>
-            <p class="text-xs text-slate-400 line-clamp-2 mt-1">${item.summary || 'Sin sinopsis disponible.'}</p>
+            <p class="text-xs text-slate-400 line-clamp-2 mt-1">${getSummary(item)}</p>
             ${item.matchedPerson ? `
               <p class="text-[11px] text-amber-300/90 mt-1 flex items-center gap-1">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4M12 8h.01"></path></svg>
-                <span>${item.matchedRole === 'Director' ? 'Dirigida por' : 'Con'} ${item.matchedPerson}</span>
+                <span>${item.matchedRole === 'Director' ? t('result.directedBy') : t('result.with')} ${item.matchedPerson}</span>
               </p>
             ` : ''}
             ${Array.isArray(item.cast) && item.cast.length > 0 ? `
               <p class="text-[11px] text-slate-500 line-clamp-1 mt-1">
-                <span class="text-slate-600">Reparto:</span> ${item.cast.slice(0, 5).join(', ')}
+                <span class="text-slate-600">${t('result.cast')}</span> ${item.cast.slice(0, 5).join(', ')}
               </p>
             ` : ''}
             
             <div class="mt-3 flex flex-wrap items-center justify-between gap-2">
               <select id="statusSelect_${index}" class="text-xs bg-slate-900 text-slate-300 border border-slate-700 rounded-lg px-2 py-1 outline-none focus:border-amber-500">
-                <option value="watching">Viendo</option>
-                <option value="plan_to_watch" selected>Por ver</option>
-                <option value="completed">Completada</option>
+                <option value="watching">${t('statusChip.watching')}</option>
+                <option value="plan_to_watch" selected>${t('manualStatus.plan')}</option>
+                <option value="completed">${t('editStatus.completed')}</option>
               </select>
 
               <button 
                 data-add-index="${index}"
                 class="text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 px-3 py-1 rounded-lg transition-all flex items-center gap-1 shadow-md shadow-amber-500/20">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                <span>Añadir</span>
+                <span>${t('action.add')}</span>
               </button>
             </div>
           </div>
@@ -901,7 +932,7 @@ document.addEventListener('DOMContentLoaded', () => {
                   id: ep.id,
                   season: ep.season || 1,
                   number: ep.number || 1,
-                  name: ep.name || `Capítulo ${ep.number || 1}`,
+                  name: ep.name || '',
                   runtime: ep.runtime || item.episodeDuration || 45,
                   airdate: ep.airdate || null,
                   summary: API_SERVICE.stripHtml(ep.summary)
@@ -930,11 +961,11 @@ document.addEventListener('DOMContentLoaded', () => {
           });
 
           if (result.success) {
-            showToast(`¡"${item.title}" añadida a tu lista!`);
+            showToast(t('toast.added', { t: item.title }));
             renderLibrary();
             addBtn.innerHTML = `
               <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
-              <span>Añadido</span>
+              <span>${t('result.added')}</span>
             `;
             addBtn.className = 'text-xs font-semibold bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 px-3 py-1 rounded-lg flex items-center gap-1 cursor-default';
             addBtn.disabled = true;
@@ -948,7 +979,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     } catch (err) {
       DOM.apiSearchLoading.classList.add('hidden');
-      showToast('Error al consultar la API de portadas.', 'error');
+      showToast(t('search.error'), 'error');
     }
   }
 
@@ -972,7 +1003,7 @@ document.addEventListener('DOMContentLoaded', () => {
           id: `fb_${s}_${n}`,
           season: s,
           number: n,
-          name: `Capítulo ${n}`,
+          name: '',
           runtime: epDuration
         });
       }
@@ -997,7 +1028,7 @@ document.addEventListener('DOMContentLoaded', () => {
             id: ep.id,
             season: ep.season || 1,
             number: ep.number || 1,
-            name: ep.name || `Capítulo ${ep.number || 1}`,
+            name: ep.name || '',
             runtime: ep.runtime || item.episodeDuration || 45,
             airdate: ep.airdate || null,
             summary: API_SERVICE.stripHtml(ep.summary)
@@ -1056,7 +1087,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
           </svg>
-          <span>Cargando temporadas y episodios exactos...</span>
+          <span>${t('ep.loading')}</span>
         </div>
       `;
     }
@@ -1113,17 +1144,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnToggleAllSeriesText = document.getElementById('btnToggleAllSeriesText');
     const seriesSeasonsSummary = document.getElementById('seriesSeasonsSummary');
 
-    if (progressTextEl) progressTextEl.textContent = `${totalWatched} / ${totalEpisodes} vistos (${percent}%)`;
+    if (progressTextEl) progressTextEl.textContent = t('series.progress', { w: totalWatched, t: totalEpisodes, p: percent });
     if (progressBarEl) progressBarEl.style.width = `${percent}%`;
-    if (seriesSeasonsSummary) seriesSeasonsSummary.textContent = `${seasonNumbers.length} temporada${seasonNumbers.length === 1 ? '' : 's'} disponible${seasonNumbers.length === 1 ? '' : 's'}`;
+    if (seriesSeasonsSummary) seriesSeasonsSummary.textContent = tp('count.seasonsAvailable', seasonNumbers.length);
 
     const isAllSeriesComplete = totalWatched === totalEpisodes && totalEpisodes > 0;
     if (btnToggleAllSeries && btnToggleAllSeriesText) {
       if (isAllSeriesComplete) {
-        btnToggleAllSeriesText.textContent = 'Desmarcar serie completa';
+        btnToggleAllSeriesText.textContent = t('series.unmarkAll');
         btnToggleAllSeries.className = 'text-xs font-bold px-3 py-1.5 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-rose-500/20 hover:text-rose-300 hover:border-rose-500/40 transition-all flex items-center gap-1.5 cursor-pointer shadow-sm';
       } else {
-        btnToggleAllSeriesText.textContent = 'Marcar serie completa';
+        btnToggleAllSeriesText.textContent = t('series.markAll');
         btnToggleAllSeries.className = 'text-xs font-bold px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500 text-amber-300 hover:text-slate-950 border border-amber-500/30 transition-all flex items-center gap-1.5 cursor-pointer shadow-sm';
       }
 
@@ -1139,7 +1170,7 @@ document.addEventListener('DOMContentLoaded', () => {
           document.getElementById('editStatus').value = item.status;
           renderSeriesEpisodesUI(item, activeSeason);
           renderLibrary();
-          showToast(shouldComplete ? `¡"${item.title}" completada al 100%! 🎉` : `Serie desmarcada`);
+          showToast(shouldComplete ? t('toast.seriesDone', { t: item.title }) : t('toast.seriesUndone'));
         }
       };
     }
@@ -1163,7 +1194,7 @@ document.addEventListener('DOMContentLoaded', () => {
             : 'shrink-0 px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-900 text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800 transition-all cursor-pointer flex items-center gap-1.5');
 
         tabBtn.innerHTML = `
-          <span>Temp. ${sNum}</span>
+          <span>${t('season.tab', { n: sNum })}</span>
           <span class="text-[10px] font-semibold opacity-90 ${isActive ? 'bg-slate-950/20 px-1.5 py-0.5 rounded' : ''}">${sComplete ? '✓' : `${sWatched}/${sEps.length}`}</span>
         `;
 
@@ -1185,15 +1216,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnToggleSeason = document.getElementById('btnToggleActiveSeason');
     const btnToggleSeasonText = document.getElementById('btnToggleActiveSeasonText');
 
-    if (titleEl) titleEl.textContent = `Temporada ${activeSeason}`;
-    if (badgeEl) badgeEl.textContent = `${activeSeasonWatched} / ${activeSeasonEps.length} vistos`;
+    if (titleEl) titleEl.textContent = t('season.title', { n: activeSeason });
+    if (badgeEl) badgeEl.textContent = t('season.badge', { a: activeSeasonWatched, b: activeSeasonEps.length });
 
     if (btnToggleSeason && btnToggleSeasonText) {
       if (isSeasonComplete) {
-        btnToggleSeasonText.textContent = 'Desmarcar temporada';
+        btnToggleSeasonText.textContent = t('season.unmark');
         btnToggleSeason.className = 'text-xs font-semibold px-2.5 py-1 rounded-lg bg-rose-500/15 hover:bg-rose-500 text-rose-300 hover:text-white border border-rose-500/30 transition-all flex items-center gap-1.5 cursor-pointer';
       } else {
-        btnToggleSeasonText.textContent = 'Marcar temp. completa';
+        btnToggleSeasonText.textContent = t('season.mark');
         btnToggleSeason.className = 'text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-amber-500 text-slate-200 hover:text-slate-950 border border-slate-700/80 transition-all flex items-center gap-1.5 cursor-pointer';
       }
 
@@ -1209,7 +1240,7 @@ document.addEventListener('DOMContentLoaded', () => {
           document.getElementById('editStatus').value = item.status;
           renderSeriesEpisodesUI(item, activeSeason);
           renderLibrary();
-          showToast(shouldCompleteSeason ? `¡Temporada ${activeSeason} completada!` : `Temporada ${activeSeason} desmarcada`);
+          showToast(shouldCompleteSeason ? t('toast.seasonDone', { n: activeSeason }) : t('toast.seasonUndone', { n: activeSeason }));
         }
       };
     }
@@ -1238,14 +1269,14 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="min-w-0 flex-grow">
               <div class="flex items-center gap-2">
                 <span class="text-xs font-bold ${isWatched ? 'text-amber-400' : 'text-slate-400'}">E${ep.number}</span>
-                <span class="text-xs font-semibold truncate ${isWatched ? 'text-white' : 'text-slate-200'}">${ep.name || `Episodio ${ep.number}`}</span>
+                <span class="text-xs font-semibold truncate ${isWatched ? 'text-white' : 'text-slate-200'}">${episodeName(ep)}</span>
               </div>
               ${(durationBadge || airdateBadge) ? `<div class="flex items-center gap-2 mt-0.5">${durationBadge}${airdateBadge}</div>` : ''}
             </div>
           </div>
           <div class="shrink-0 flex items-center gap-1">
             <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full transition-all ${isWatched ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'text-slate-400 opacity-0 group-hover:opacity-100 bg-slate-800/80'}">
-              ${isWatched ? 'Visto' : 'Marcar'}
+              ${isWatched ? t('ep.watched') : t('ep.mark')}
             </span>
           </div>
         `;
@@ -1278,14 +1309,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // Rellenar formulario
     document.getElementById('editItemId').value = item.id;
     document.getElementById('editTitle').textContent = item.title;
-    document.getElementById('editTypeBadge').textContent = item.type === 'movie' ? 'Película' : 'Serie';
+    document.getElementById('editTypeBadge').textContent = item.type === 'movie' ? t('type.movie') : t('type.series');
     document.getElementById('editTypeBadge').className = `text-xs font-bold uppercase tracking-wider text-white px-2 py-0.5 rounded ${item.type === 'movie' ? 'badge-movie' : 'badge-series'}`;
     document.getElementById('editYear').textContent = item.year || 'N/A';
     const durationEl = document.getElementById('editDurationBadge');
     if (durationEl) {
       durationEl.textContent = item.duration ? `• ${item.duration}` : '';
     }
-    document.getElementById('editSummary').textContent = item.summary || 'Sin sinopsis disponible.';
+    document.getElementById('editSummary').textContent = getSummary(item);
 
     const castRow = document.getElementById('editCastRow');
     const hasCastInfo = item.type === 'movie' && (
@@ -1298,17 +1329,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const directorLine = document.getElementById('editDirectorLine');
         const castLine = document.getElementById('editCastLine');
         directorLine.innerHTML = (item.director && item.director !== 'Desconocido')
-          ? `<span class="text-slate-500">Dirigida por</span> <span class="font-semibold text-white">${item.director}</span>`
+          ? `<span class="text-slate-500">${t('detail.directedBy')}</span> <span class="font-semibold text-white">${item.director}</span>`
           : '';
         castLine.innerHTML = (Array.isArray(item.cast) && item.cast.length > 0)
-          ? `<span class="text-slate-500">Reparto:</span> ${item.cast.slice(0, 5).join(', ')}`
+          ? `<span class="text-slate-500">${t('detail.cast')}</span> ${item.cast.slice(0, 5).join(', ')}`
           : '';
       } else {
         castRow.classList.add('hidden');
       }
     }
     const editImg = document.getElementById('editPosterImg');
-    editImg.alt = item.title || 'Portada';
+    editImg.alt = item.title || t('detail.cover');
     editImg.onerror = () => API_SERVICE.handleImgError(editImg, item.type);
     editImg.src = item.poster || API_SERVICE.getPlaceholderPoster(item.title, item.type);
 
@@ -1325,7 +1356,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const editGenresInput = document.getElementById('editGenres');
     if (editGenresInput) {
-      editGenresInput.value = (item.genres && Array.isArray(item.genres)) ? item.genres.join(', ') : '';
+      editGenresInput.value = (item.genres && Array.isArray(item.genres)) ? item.genres.map(g => GENRES.label(g)).join(', ') : '';
     }
 
     // Mostrar u ocultar controles de episodios si es serie
@@ -1392,17 +1423,17 @@ document.addEventListener('DOMContentLoaded', () => {
     STORAGE_SERVICE.updateItem(id, updates);
     renderLibrary();
     closeEditModal();
-    showToast(`Guardado correctamente`);
+    showToast(t('toast.saved'));
   });
 
   // Eliminar ítem
   DOM.deleteItemBtn.addEventListener('click', () => {
     if (!state.activeModalItem) return;
-    if (confirm(`¿Estás seguro de eliminar "${state.activeModalItem.title}" de tu lista?`)) {
+    if (confirm(t('confirm.delete', { t: state.activeModalItem.title }))) {
       STORAGE_SERVICE.deleteItem(state.activeModalItem.id);
       renderLibrary();
       closeEditModal();
-      showToast(`"${state.activeModalItem.title}" eliminado`);
+      showToast(t('toast.deleted', { t: state.activeModalItem.title }));
     }
   });
 
@@ -1449,7 +1480,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const summary = document.getElementById('manualSummary').value.trim();
 
     const rawGenres = document.getElementById('manualGenres') ? document.getElementById('manualGenres').value.trim() : '';
-    const genres = rawGenres ? rawGenres.split(',').map(g => g.trim()).filter(Boolean) : (type === 'movie' ? ['Cine'] : ['Serie']);
+    const genres = rawGenres ? rawGenres.split(',').map(g => g.trim()).filter(Boolean) : (type === 'movie' ? [t('genre.defaultMovie')] : [t('genre.defaultSeries')]);
 
     const newItem = {
       title,
@@ -1482,7 +1513,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (res.success) {
       renderLibrary();
       closeManualModal();
-      showToast(`"${title}" añadido manualmente.`);
+      showToast(t('toast.addedManual', { t: title }));
     } else {
       showToast(res.message, 'error');
     }
@@ -1535,7 +1566,7 @@ document.addEventListener('DOMContentLoaded', () => {
   DOM.exportBtn.addEventListener('click', () => {
     STORAGE_SERVICE.exportData();
     closeOptionsMenu();
-    showToast('Copia de seguridad descargada en JSON.');
+    showToast(t('toast.backupDownloaded'));
   });
 
   DOM.importBtn.addEventListener('click', () => {
@@ -1552,9 +1583,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const res = STORAGE_SERVICE.importData(event.target.result);
       if (res.success) {
         renderLibrary();
-        showToast(`Se importaron ${res.count} títulos con éxito.`);
+        showToast(tp('count.titlesImported', res.count));
       } else {
-        showToast('Error al importar archivo: ' + res.error, 'error');
+        showToast(t('toast.importError', { e: res.error }), 'error');
       }
     };
     reader.readAsText(file);
@@ -1563,10 +1594,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   DOM.resetDemoBtn.addEventListener('click', () => {
     closeOptionsMenu();
-    if (confirm('¿Deseas restaurar la lista con los ejemplos predeterminados? Tus cambios actuales se reemplazarán.')) {
+    if (confirm(t('confirm.reset'))) {
       STORAGE_SERVICE.resetToDemo();
       renderLibrary();
-      showToast('Lista restaurada a datos de ejemplo.');
+      showToast(t('toast.resetDone'));
     }
   });
 
@@ -1684,21 +1715,21 @@ document.addEventListener('DOMContentLoaded', () => {
       const value = DOM.apiKeyInput.value.trim();
 
       if (!value) {
-        showToast('Escribe la clave o pulsa "Borrar clave"', 'error');
+        showToast(t('toast.keyNeeded'), 'error');
         return;
       }
       if (!/^[a-f0-9]{32}$/i.test(value)) {
-        showToast('Esa no parece la clave v3: son 32 caracteres hexadecimales', 'error');
+        showToast(t('toast.keyInvalid'), 'error');
         return;
       }
       if (!API_SERVICE.setTmdbKey(value)) {
-        showToast('No se pudo guardar la clave en este navegador', 'error');
+        showToast(t('toast.keySaveFail'), 'error');
         return;
       }
 
       refreshApiKeyUI();
       closeApiKeyModal();
-      showToast('Clave guardada. Ya puedes buscar películas');
+      showToast(t('toast.keySaved'));
 
       // Si el buscador está abierto con texto, se repite la búsqueda
       if (DOM.searchModal && !DOM.searchModal.classList.contains('hidden') && DOM.apiSearchInput.value.trim()) {
@@ -1710,13 +1741,13 @@ document.addEventListener('DOMContentLoaded', () => {
   if (DOM.deleteApiKeyBtn) {
     DOM.deleteApiKeyBtn.addEventListener('click', () => {
       if (!API_SERVICE.getTmdbKey()) {
-        showToast('No hay ninguna clave guardada', 'error');
+        showToast(t('toast.keyNone'), 'error');
         return;
       }
       API_SERVICE.setTmdbKey('');
       DOM.apiKeyInput.value = '';
       refreshApiKeyUI();
-      showToast('Clave borrada de este dispositivo');
+      showToast(t('toast.keyDeleted'));
     });
   }
 
@@ -1761,6 +1792,19 @@ document.addEventListener('DOMContentLoaded', () => {
       DOM.seriesGenreIcon.classList.toggle('-rotate-90');
     });
   }
+
+  // ==========================================
+  // IDIOMA (español / inglés / polaco)
+  // ==========================================
+  document.querySelectorAll('[data-lang]').forEach(btn => {
+    btn.addEventListener('click', () => I18N.setLang(btn.getAttribute('data-lang')));
+  });
+
+  // I18N.setLang ya traduce el HTML estático; aquí se redibuja lo que genera app.js
+  document.addEventListener('cinetrack:languagechange', () => {
+    renderLibrary();
+    refreshApiKeyUI();
+  });
 
   // ==========================================
   // INICIALIZACIÓN

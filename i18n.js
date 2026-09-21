@@ -181,6 +181,10 @@
   add('search.addBtn', 'Añadir', 'Add', 'Dodaj');
   add('result.added','Añadido', 'Added', 'Dodano');
   add('action.add', 'Añadir', 'Add', 'Dodaj');
+  add('search.removeBtn', 'Quitar', 'Remove', 'Usuń');
+  add('preview.add', 'Añadir a mi lista', 'Add to my list', 'Dodaj do listy');
+  add('preview.remove', 'Quitar de mi lista', 'Remove from my list', 'Usuń z listy');
+  add('toast.removed', '"{t}" quitado de tu lista', '"{t}" removed from your list', '„{t}” usunięto z listy');
 
   add('offline.title', 'Sin conexión a internet', 'No internet connection', 'Brak połączenia z internetem');
   add('offline.desc1', 'El buscador necesita conexión para consultar TMDB y TVMaze.', 'The search needs a connection to query TMDB and TVMaze.', 'Wyszukiwarka wymaga połączenia, aby odpytać TMDB i TVMaze.');

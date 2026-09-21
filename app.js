@@ -14,6 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
     sortBy: 'recent',           // recent, rating, title, year
     apiSearchResults: [],       // Resultados temporales de búsqueda en APIs
     activeModalItem: null,      // Ítem actualmente abierto para editar/ver
+    activePreviewItem: null,    // Resultado de búsqueda abierto en la vista previa
     isSearchingApi: false
   };
 
@@ -853,6 +854,155 @@ document.addEventListener('DOMContentLoaded', () => {
     popModalState();
   }
 
+  // ==========================================
+  // ALTA Y BAJA DESDE EL BUSCADOR
+  // ==========================================
+
+  // Busca en la biblioteca el ítem equivalente a un resultado de búsqueda:
+  // primero por identificador de API y, si no lo hay, con el mismo criterio de
+  // duplicados que aplica STORAGE_SERVICE.addItem (título + tipo).
+  function findLibraryEntry(item) {
+    if (!item) return null;
+    const items = STORAGE_SERVICE.getItems();
+    if (item.apiId) {
+      const byApiId = items.find(i => i.apiId && i.apiId === item.apiId);
+      if (byApiId) return byApiId;
+    }
+    const title = (item.title || '').toLowerCase();
+    return items.find(i => (i.title || '').toLowerCase() === title && i.type === item.type) || null;
+  }
+
+  const ICON_PLUS = '<line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line>';
+  const ICON_CHECK = '<polyline points="20 6 9 17 4 12"></polyline>';
+  const ICON_CROSS = '<line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>';
+
+  function toggleIcon(paths, sizeClass) {
+    return `<svg xmlns="http://www.w3.org/2000/svg" class="${sizeClass}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">${paths}</svg>`;
+  }
+
+  // Pinta un botón como "Añadir" o como "Añadido / Quitar" (al pasar por encima),
+  // de modo que el mismo botón sirva para las dos acciones.
+  function paintToggleButton(btn, isAdded, variant) {
+    if (!btn) return;
+    const isCard = variant === 'card';
+    const iconSize = isCard ? 'w-3.5 h-3.5' : 'w-4 h-4';
+    const shape = isCard
+      ? 'font-bold text-[11px] px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 shrink-0'
+      : 'font-bold text-xs px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 w-full sm:w-auto justify-center';
+    const addLabel = isCard ? t('search.addBtn') : t('preview.add');
+
+    btn.disabled = false;
+    btn.dataset.added = isAdded ? '1' : '0';
+
+    if (isAdded) {
+      btn.className = `group ${shape} bg-emerald-600/25 border border-emerald-500/40 text-emerald-300 hover:bg-rose-600/25 hover:border-rose-500/40 hover:text-rose-200`;
+      btn.title = t('preview.remove');
+      btn.innerHTML = `
+        <span class="flex items-center gap-1.5 group-hover:hidden">${toggleIcon(ICON_CHECK, iconSize)}${t('result.added')}</span>
+        <span class="hidden items-center gap-1.5 group-hover:flex">${toggleIcon(ICON_CROSS, iconSize)}${t('search.removeBtn')}</span>
+      `;
+    } else {
+      btn.className = `${shape} bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-lg shadow-amber-500/20`;
+      btn.title = addLabel;
+      btn.innerHTML = `${toggleIcon(ICON_PLUS, iconSize)}<span>${addLabel}</span>`;
+    }
+  }
+
+  // Completa el ítem con sus episodios reales y lo guarda. Lo usan tanto las
+  // tarjetas de resultados como la ficha de vista previa.
+  async function addSearchItemToLibrary(item, chosenStatus) {
+    let totalEpisodes = item.totalEpisodes || 10;
+    let totalSeasons = item.totalSeasons || 1;
+    let episodesList = null;
+    let watchedEpisodes = [];
+    let currentEpisode = 0;
+    let currentSeason = 1;
+
+    // Si es serie, obtener el recuento real de episodios
+    if (item.type === 'series' && item.originalId) {
+      try {
+        const episodes = await API_SERVICE.getShowEpisodes(item.originalId);
+        if (episodes && episodes.length > 0) {
+          episodesList = mapApiEpisodes(episodes, item.episodeDuration);
+          totalEpisodes = episodesList.length;
+          totalSeasons = Math.max(1, ...episodesList.map(ep => ep.season));
+        }
+      } catch (e) {
+        console.warn('No se pudieron obtener episodios detallados:', e);
+      }
+    }
+
+    if (item.type === 'series' && chosenStatus === 'completed') {
+      if (!episodesList) {
+        episodesList = generateFallbackEpisodes(totalSeasons, totalEpisodes, item.episodeDuration);
+      }
+      watchedEpisodes = episodesList.map(ep => `${ep.season}_${ep.number}`);
+      currentEpisode = totalEpisodes;
+      currentSeason = totalSeasons;
+    }
+
+    return STORAGE_SERVICE.addItem({
+      ...item,
+      totalEpisodes,
+      totalSeasons,
+      status: chosenStatus,
+      episodesList,
+      watchedEpisodes,
+      currentEpisode,
+      currentSeason
+    });
+  }
+
+  // Quita de la biblioteca el ítem equivalente al resultado de búsqueda
+  function removeSearchItemFromLibrary(item) {
+    const entry = findLibraryEntry(item);
+    if (!entry) return false;
+    STORAGE_SERVICE.deleteItem(entry.id);
+    return true;
+  }
+
+  // Añade o quita según el estado actual; devuelve true si la biblioteca cambió
+  async function toggleSearchItem(item, btn, variant, getStatus) {
+    if (!item || !btn) return false;
+    const wasAdded = findLibraryEntry(item) !== null;
+
+    btn.disabled = true;
+    try {
+      if (wasAdded) {
+        removeSearchItemFromLibrary(item);
+        showToast(t('toast.removed', { t: item.title }));
+      } else {
+        const status = (typeof getStatus === 'function' && getStatus()) || 'plan_to_watch';
+        const result = await addSearchItemToLibrary(item, status);
+        if (!result.success) {
+          showToast(result.message, 'error');
+          paintToggleButton(btn, findLibraryEntry(item) !== null, variant);
+          return false;
+        }
+        showToast(t('toast.added', { t: item.title }));
+      }
+    } catch (e) {
+      console.error('No se pudo actualizar la biblioteca:', e);
+      showToast(t('search.error'), 'error');
+      paintToggleButton(btn, findLibraryEntry(item) !== null, variant);
+      return false;
+    }
+
+    renderLibrary();
+    syncSearchResultButtons();
+    updatePreviewAddBtn();
+    return true;
+  }
+
+  // Repinta los botones de los resultados abiertos tras cualquier alta o baja
+  function syncSearchResultButtons() {
+    if (!DOM.apiSearchResults) return;
+    DOM.apiSearchResults.querySelectorAll('[data-add-index]').forEach(btn => {
+      const item = state.apiSearchResults[parseInt(btn.getAttribute('data-add-index'), 10)];
+      if (item) paintToggleButton(btn, findLibraryEntry(item) !== null, 'card');
+    });
+  }
+
   async function handleApiSearch() {
     const query = DOM.apiSearchInput.value.trim();
     const filter = DOM.apiFilterSelect.value;
@@ -952,10 +1102,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <option value="watching">${t('manualStatus.watching') || 'Viendo ahora'}</option>
                 <option value="completed">${t('editStatus.completed') || 'Completada'}</option>
               </select>
-              <button data-add-index="${index}" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-[11px] px-3 py-1.5 rounded-lg shadow-lg shadow-amber-500/20 transition-all flex items-center gap-1.5 shrink-0">
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                ${t('search.addBtn')}
-              </button>
+              <button type="button" data-add-index="${index}"></button>
             </div>
           </div>
         `;
@@ -966,62 +1113,12 @@ document.addEventListener('DOMContentLoaded', () => {
           openPreviewModal(item);
         });
 
-        // Evento botón añadir
+        // Evento botón añadir / quitar
         const addBtn = resultCard.querySelector(`[data-add-index="${index}"]`);
-        addBtn.addEventListener('click', async () => {
+        paintToggleButton(addBtn, findLibraryEntry(item) !== null, 'card');
+        addBtn.addEventListener('click', () => {
           const statusSelect = resultCard.querySelector(`#statusSelect_${index}`);
-          const chosenStatus = statusSelect.value;
-          
-          let totalEpisodes = item.totalEpisodes || 10;
-          let totalSeasons = item.totalSeasons || 1;
-          let episodesList = null;
-          let watchedEpisodes = [];
-          let currentEpisode = 0;
-          let currentSeason = 1;
-
-          // Si es serie de TVMaze, obtener recuento real de episodios
-          if (item.type === 'series' && item.originalId) {
-            try {
-              const episodes = await API_SERVICE.getShowEpisodes(item.originalId);
-              if (episodes && episodes.length > 0) {
-                episodesList = mapApiEpisodes(episodes, item.episodeDuration);
-                totalEpisodes = episodesList.length;
-                totalSeasons = Math.max(1, ...episodesList.map(ep => ep.season));
-              }
-            } catch (e) {
-              console.warn('No se pudieron obtener episodios detallados:', e);
-            }
-          }
-
-          if (item.type === 'series' && chosenStatus === 'completed' && episodesList) {
-            watchedEpisodes = episodesList.map(ep => `${ep.season}_${ep.number}`);
-            currentEpisode = totalEpisodes;
-            currentSeason = totalSeasons;
-          }
-
-          const result = STORAGE_SERVICE.addItem({
-            ...item,
-            totalEpisodes,
-            totalSeasons,
-            status: chosenStatus,
-            episodesList,
-            watchedEpisodes,
-            currentEpisode,
-            currentSeason
-          });
-
-          if (result.success) {
-            showToast(t('toast.added', { t: item.title }));
-            renderLibrary();
-            addBtn.innerHTML = `
-              <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
-              <span>${t('result.added')}</span>
-            `;
-            addBtn.className = 'text-xs font-semibold bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 px-3 py-1 rounded-lg flex items-center gap-1 cursor-default';
-            addBtn.disabled = true;
-          } else {
-            showToast(result.message, 'error');
-          }
+          toggleSearchItem(item, addBtn, 'card', () => statusSelect && statusSelect.value);
         });
 
         DOM.apiSearchResults.appendChild(resultCard);
@@ -1534,6 +1631,7 @@ document.addEventListener('DOMContentLoaded', () => {
       DOM.previewCastRow.classList.add('hidden');
     }
 
+    updatePreviewAddBtn();
     DOM.previewModal.classList.remove('hidden');
     pushModalState();
   }
@@ -1548,56 +1646,21 @@ document.addEventListener('DOMContentLoaded', () => {
     DOM.closePreviewModalBtn.addEventListener('click', closePreviewModal);
   }
 
+  // Refleja en el botón de la ficha si el título ya está en la biblioteca
+  function updatePreviewAddBtn() {
+    if (!DOM.previewAddBtn || !state.activePreviewItem) return;
+    paintToggleButton(DOM.previewAddBtn, findLibraryEntry(state.activePreviewItem) !== null, 'preview');
+  }
+
   if (DOM.previewAddBtn) {
-    DOM.previewAddBtn.addEventListener('click', async () => {
+    DOM.previewAddBtn.addEventListener('click', () => {
       if (!state.activePreviewItem) return;
-      const status = DOM.previewStatusSelect ? DOM.previewStatusSelect.value : 'plan_to_watch';
-      const itemToAdd = { ...state.activePreviewItem, status: status, dateAdded: new Date().toISOString() };
-      
-      let totalEpisodes = itemToAdd.totalEpisodes || 10;
-      let totalSeasons = itemToAdd.totalSeasons || 1;
-      let episodesList = null;
-      let watchedEpisodes = [];
-      let currentEpisode = 0;
-      let currentSeason = 1;
-
-      // Obtener recuento real de TVMaze para la librería (como hace el botón normal)
-      if (itemToAdd.type === 'series' && itemToAdd.originalId) {
-        try {
-          const episodes = await API_SERVICE.getShowEpisodes(itemToAdd.originalId);
-          if (episodes && episodes.length > 0) {
-            totalEpisodes = episodes.length;
-            const maxSeason = Math.max(...episodes.map(ep => ep.season || 1));
-            totalSeasons = maxSeason || 1;
-            episodesList = episodes.map(ep => ({ id: ep.id, name: ep.name, season: ep.season, number: ep.number }));
-          }
-        } catch (e) { console.error('Error al obtener episodios:', e); }
-      }
-
-      if (status === 'completed') {
-        currentEpisode = totalEpisodes;
-        if (episodesList) {
-          watchedEpisodes = episodesList.map(ep => `${ep.season}-${ep.number}`);
-        } else {
-          for (let s = 1; s <= totalSeasons; s++) {
-            const epsThisSeason = Math.ceil(totalEpisodes / totalSeasons);
-            for (let e = 1; e <= epsThisSeason; e++) watchedEpisodes.push(`${s}-${e}`);
-          }
-        }
-      }
-
-      itemToAdd.totalEpisodes = totalEpisodes;
-      itemToAdd.totalSeasons = totalSeasons;
-      itemToAdd.episodes = episodesList || generateFallbackEpisodes(totalSeasons, totalEpisodes);
-      itemToAdd.watchedEpisodes = watchedEpisodes;
-      itemToAdd.currentEpisode = currentEpisode;
-      itemToAdd.currentSeason = currentSeason;
-
-      STORAGE_SERVICE.saveItem(itemToAdd);
-      showToast(t('toast.added', { t: itemToAdd.title }) || `"${itemToAdd.title}" añadida a tu lista!`);
-      renderLibrary();
-      closePreviewModal();
-      closeSearchModal();
+      toggleSearchItem(
+        state.activePreviewItem,
+        DOM.previewAddBtn,
+        'preview',
+        () => DOM.previewStatusSelect && DOM.previewStatusSelect.value
+      );
     });
   }
 
@@ -2072,6 +2135,8 @@ document.addEventListener('DOMContentLoaded', () => {
   document.addEventListener('cinetrack:languagechange', () => {
     renderLibrary();
     refreshApiKeyUI();
+    syncSearchResultButtons();
+    updatePreviewAddBtn();
   });
 
   // ==========================================

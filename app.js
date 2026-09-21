@@ -78,6 +78,7 @@ document.addEventListener('DOMContentLoaded', () => {
     closeEditModalBtn: document.getElementById('closeEditModalBtn'),
     editForm: document.getElementById('editForm'),
     deleteItemBtn: document.getElementById('deleteItemBtn'),
+    shareItemBtn: document.getElementById('shareItemBtn'),
 
     // Manual Add Modal
     manualModal: document.getElementById('manualModal'),
@@ -1481,6 +1482,36 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  // Compartir ítem
+  if (DOM.shareItemBtn) {
+    DOM.shareItemBtn.addEventListener('click', async () => {
+      if (!state.activeModalItem) return;
+      const title = state.activeModalItem.title;
+      // Creamos la URL para compartir, usando '?search=' seguido del título encodeado
+      const shareUrl = `${window.location.origin}${window.location.pathname}?search=${encodeURIComponent(title)}`;
+      
+      const shareData = {
+        title: title,
+        text: t('share.text', { t: title }) || `¡Mira "${title}" en CineTrack!`,
+        url: shareUrl
+      };
+
+      try {
+        if (navigator.share) {
+          await navigator.share(shareData);
+        } else {
+          // Fallback a portapapeles
+          await navigator.clipboard.writeText(shareUrl);
+          showToast(t('toast.linkCopied') || 'Enlace copiado al portapapeles');
+        }
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          console.error('Error al compartir:', err);
+        }
+      }
+    });
+  }
+
   // Actualizar etiqueta del slider de estrellas en edición
   document.getElementById('editRating').addEventListener('input', (e) => {
     document.getElementById('editRatingValue').textContent = e.target.value + ' / 10';
@@ -1859,4 +1890,16 @@ document.addEventListener('DOMContentLoaded', () => {
   renderLibrary();
   refreshApiKeyUI();
 
+  // Comprobar si hay un parámetro de compartir (?search=)
+  const urlParams = new URLSearchParams(window.location.search);
+  const shareQuery = urlParams.get('search');
+  if (shareQuery) {
+    // Limpiamos la URL para evitar que se vuelva a buscar al recargar
+    window.history.replaceState({}, document.title, window.location.pathname);
+    
+    // Abrimos el buscador y lanzamos la búsqueda
+    openSearchModal();
+    DOM.apiSearchInput.value = shareQuery;
+    handleApiSearch();
+  }
 });

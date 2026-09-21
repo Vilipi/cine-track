@@ -271,8 +271,10 @@
   add('toast.added', '¡"{t}" añadida a tu lista!', '"{t}" added to your list!', '„{t}” dodano do Twojej listy!');
   add('toast.addedManual', '"{t}" añadido manualmente.', '"{t}" added manually.', '„{t}” dodano ręcznie.');
   add('toast.saved', 'Guardado correctamente', 'Saved successfully', 'Zapisano pomyślnie');
-  add('toast.deleted', '"{t}" eliminado', '"{t}" removed', '„{t}” usunięto');
-  add('toast.seriesDone', '¡"{t}" completada al 100%! 🎉', '"{t}" completed 100%! 🎉', '„{t}” ukończono w 100%! 🎉');
+  add('toast.deleted', '"{t}" eliminado', '"{t}" removed', '"{t}" usunieto');
+  add('share.text', '¡Mira "{t}" en CineTrack!', 'Check out "{t}" on CineTrack!', 'Sprawdź "{t}" na CineTrack!');
+  add('toast.linkCopied', 'Enlace copiado al portapapeles', 'Link copied to clipboard', 'Link skopiowany do schowka');
+  add('toast.seriesDone', '¡"{t}" completada al 100%! 🏆', '"{t}" completed 100%! 🏆', '„{t}” ukończono w 100%! 🏆');
   add('toast.seriesUndone', 'Serie desmarcada', 'Series unmarked', 'Serial odznaczony');
   add('toast.seasonDone', '¡Temporada {n} completada!', 'Season {n} completed!', 'Sezon {n} ukończony!');
   add('toast.seasonUndone', 'Temporada {n} desmarcada', 'Season {n} unmarked', 'Sezon {n} odznaczony');

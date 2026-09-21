@@ -80,6 +80,22 @@ document.addEventListener('DOMContentLoaded', () => {
     deleteItemBtn: document.getElementById('deleteItemBtn'),
     shareItemBtn: document.getElementById('shareItemBtn'),
 
+    // Preview Modal
+    previewModal: document.getElementById('previewModal'),
+    closePreviewModalBtn: document.getElementById('closePreviewModalBtn'),
+    previewPosterImg: document.getElementById('previewPosterImg'),
+    previewTypeBadge: document.getElementById('previewTypeBadge'),
+    previewYear: document.getElementById('previewYear'),
+    previewDurationBadge: document.getElementById('previewDurationBadge'),
+    previewTitle: document.getElementById('previewTitle'),
+    previewSummary: document.getElementById('previewSummary'),
+    previewCastRow: document.getElementById('previewCastRow'),
+    previewDirectorLine: document.getElementById('previewDirectorLine'),
+    previewCastLine: document.getElementById('previewCastLine'),
+    previewAddBtn: document.getElementById('previewAddBtn'),
+    previewShareBtn: document.getElementById('previewShareBtn'),
+    previewStatusSelect: document.getElementById('previewStatusSelect'),
+
     // Manual Add Modal
     manualModal: document.getElementById('manualModal'),
     openManualModalBtn: document.getElementById('openManualModalBtn'),
@@ -163,7 +179,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function closeAllModals() {
-    [DOM.searchModal, DOM.editModal, DOM.manualModal, DOM.apiKeyModal].forEach(m => {
+    [DOM.searchModal, DOM.editModal, DOM.previewModal, DOM.manualModal, DOM.apiKeyModal].forEach(m => {
       if (m) m.classList.add('hidden');
     });
     if (typeof closeOptionsMenu === 'function') closeOptionsMenu();
@@ -899,7 +915,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       results.forEach((item, index) => {
         const resultCard = document.createElement('div');
-        resultCard.className = 'flex gap-3.5 p-3 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 hover:border-amber-500/50 transition-all items-start';
+        resultCard.className = 'flex gap-3.5 p-3 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 hover:border-amber-500/50 transition-all items-start cursor-pointer';
 
         const safeTitle = (item.title || t('card.titleFallback')).replace(/"/g, '&quot;');
         const posterSrc = item.poster || API_SERVICE.getPlaceholderPoster(item.title, item.type);
@@ -917,7 +933,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 ${item.type === 'movie' ? t('type.movie') : t('type.series')}
               </span>
               <span class="text-xs text-slate-400 font-medium">${item.year || ''}</span>
-              ${item.duration ? `<span class="text-xs text-slate-400 font-medium">• ${item.duration}</span>` : ''}
+              ${item.duration ? `<span class="text-xs text-slate-400 font-medium">  ${item.duration}</span>` : ''}
             </div>
             <h4 class="font-bold text-white text-sm line-clamp-1 mt-1">${item.title}</h4>
             <p class="text-xs text-slate-400 line-clamp-2 mt-1">${getSummary(item)}</p>
@@ -927,28 +943,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 <span>${item.matchedRole === 'Director' ? t('result.directedBy') : t('result.with')} ${item.matchedPerson}</span>
               </p>
             ` : ''}
-            ${Array.isArray(item.cast) && item.cast.length > 0 ? `
-              <p class="text-[11px] text-slate-500 line-clamp-1 mt-1">
-                <span class="text-slate-600">${t('result.cast')}</span> ${item.cast.slice(0, 5).join(', ')}
-              </p>
-            ` : ''}
-            
-            <div class="mt-3 flex flex-wrap items-center justify-between gap-2">
-              <select id="statusSelect_${index}" class="text-xs bg-slate-900 text-slate-300 border border-slate-700 rounded-lg px-2 py-1 outline-none focus:border-amber-500">
-                <option value="watching">${t('statusChip.watching')}</option>
-                <option value="plan_to_watch" selected>${t('manualStatus.plan')}</option>
-                <option value="completed">${t('editStatus.completed')}</option>
+            <div class="flex items-center gap-2 mt-2">
+              <select id="statusSelect_${index}" class="bg-slate-900 text-slate-300 text-[11px] px-2 py-1.5 rounded-lg border border-slate-700/60 focus:outline-none focus:border-amber-500 appearance-none max-w-[140px] truncate">
+                <option value="plan_to_watch">${t('manualStatus.plan') || 'Quiero verla'}</option>
+                <option value="watching">${t('manualStatus.watching') || 'Viendo ahora'}</option>
+                <option value="completed">${t('editStatus.completed') || 'Completada'}</option>
               </select>
-
-              <button 
-                data-add-index="${index}"
-                class="text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 px-3 py-1 rounded-lg transition-all flex items-center gap-1 shadow-md shadow-amber-500/20">
+              <button data-add-index="${index}" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-[11px] px-3 py-1.5 rounded-lg shadow-lg shadow-amber-500/20 transition-all flex items-center gap-1.5 shrink-0" data-i18n="search.addBtn">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                <span>${t('action.add')}</span>
+                ${t('search.addBtn')}
               </button>
             </div>
           </div>
         `;
+
+        // Evento abrir modal vista previa al clicar la tarjeta
+        resultCard.addEventListener('click', (e) => {
+          if (e.target.closest('button') || e.target.closest('select')) return;
+          openPreviewModal(item);
+        });
 
         // Evento botón añadir
         const addBtn = resultCard.querySelector(`[data-add-index="${index}"]`);
@@ -1425,6 +1438,119 @@ document.addEventListener('DOMContentLoaded', () => {
     popModalState();
   }
 
+  // ==========================================
+  // PREVIEW MODAL
+  // ==========================================
+  function openPreviewModal(item) {
+    if (!DOM.previewModal) return;
+    state.activePreviewItem = item;
+
+    DOM.previewTitle.textContent = item.title;
+    DOM.previewTypeBadge.textContent = item.type === 'movie' ? t('type.movie') || 'Película' : t('type.series') || 'Serie';
+    DOM.previewTypeBadge.className = `text-xs font-bold uppercase tracking-wider text-white px-2 py-0.5 rounded ${item.type === 'movie' ? 'badge-movie' : 'badge-series'}`;
+    DOM.previewYear.textContent = item.year || 'N/A';
+    
+    if (DOM.previewDurationBadge) {
+      if (item.duration) {
+        DOM.previewDurationBadge.textContent = item.duration;
+        DOM.previewDurationBadge.classList.remove('hidden');
+      } else {
+        DOM.previewDurationBadge.classList.add('hidden');
+      }
+    }
+
+    const posterSrc = item.poster || (window.API_SERVICE ? API_SERVICE.getPlaceholderPoster(item.title, item.type) : '');
+    DOM.previewPosterImg.src = posterSrc;
+    DOM.previewSummary.textContent = item.summary || t('detail.noSynopsis');
+
+    if (item.director || item.cast) {
+      DOM.previewCastRow.classList.remove('hidden');
+      DOM.previewDirectorLine.textContent = item.director ? `${t('result.directedBy') || 'Dirigida por'}: ${item.director}` : '';
+      DOM.previewCastLine.textContent = item.cast ? `Reparto: ${item.cast}` : '';
+    } else {
+      DOM.previewCastRow.classList.add('hidden');
+    }
+
+    DOM.previewModal.classList.remove('hidden');
+    pushModalState();
+  }
+
+  function closePreviewModal() {
+    if (DOM.previewModal) DOM.previewModal.classList.add('hidden');
+    state.activePreviewItem = null;
+    popModalState();
+  }
+
+  if (DOM.closePreviewModalBtn) {
+    DOM.closePreviewModalBtn.addEventListener('click', closePreviewModal);
+  }
+
+  if (DOM.previewAddBtn) {
+    DOM.previewAddBtn.addEventListener('click', async () => {
+      if (!state.activePreviewItem) return;
+      const status = DOM.previewStatusSelect ? DOM.previewStatusSelect.value : 'plan_to_watch';
+      const itemToAdd = { ...state.activePreviewItem, status: status, dateAdded: new Date().toISOString() };
+      
+      let totalEpisodes = itemToAdd.totalEpisodes || 10;
+      let totalSeasons = itemToAdd.totalSeasons || 1;
+      let episodesList = null;
+      let watchedEpisodes = [];
+      let currentEpisode = 0;
+      let currentSeason = 1;
+
+      // Obtener recuento real de TVMaze para la librería (como hace el botón normal)
+      if (itemToAdd.type === 'series' && itemToAdd.originalId) {
+        try {
+          const episodes = await API_SERVICE.getShowEpisodes(itemToAdd.originalId);
+          if (episodes && episodes.length > 0) {
+            totalEpisodes = episodes.length;
+            const maxSeason = Math.max(...episodes.map(ep => ep.season || 1));
+            totalSeasons = maxSeason || 1;
+            episodesList = episodes.map(ep => ({ id: ep.id, name: ep.name, season: ep.season, number: ep.number }));
+          }
+        } catch (e) { console.error('Error al obtener episodios:', e); }
+      }
+
+      if (status === 'completed') {
+        currentEpisode = totalEpisodes;
+        if (episodesList) {
+          watchedEpisodes = episodesList.map(ep => `${ep.season}-${ep.number}`);
+        } else {
+          for (let s = 1; s <= totalSeasons; s++) {
+            const epsThisSeason = Math.ceil(totalEpisodes / totalSeasons);
+            for (let e = 1; e <= epsThisSeason; e++) watchedEpisodes.push(`${s}-${e}`);
+          }
+        }
+      }
+
+      itemToAdd.totalEpisodes = totalEpisodes;
+      itemToAdd.totalSeasons = totalSeasons;
+      itemToAdd.episodes = episodesList || generateFallbackEpisodes(totalSeasons, totalEpisodes);
+      itemToAdd.watchedEpisodes = watchedEpisodes;
+      itemToAdd.currentEpisode = currentEpisode;
+      itemToAdd.currentSeason = currentSeason;
+
+      STORAGE_SERVICE.saveItem(itemToAdd);
+      showToast(t('toast.added', { t: itemToAdd.title }) || `"${itemToAdd.title}" añadida a tu lista!`);
+      renderLibrary();
+      closePreviewModal();
+      closeSearchModal();
+    });
+  }
+
+  if (DOM.previewShareBtn) {
+    DOM.previewShareBtn.addEventListener('click', async () => {
+      if (!state.activePreviewItem) return;
+      const title = state.activePreviewItem.title;
+      const shareUrl = `${window.location.origin}${window.location.pathname}?search=${encodeURIComponent(title)}`;
+      const shareData = { title, text: t('share.text', { t: title }) || `¡Mira "${title}" en CineTrack!`, url: shareUrl };
+      try {
+        if (navigator.share) await navigator.share(shareData);
+        else { await navigator.clipboard.writeText(shareUrl); showToast(t('toast.linkCopied') || 'Enlace copiado al portapapeles'); }
+      } catch (err) { if (err.name !== 'AbortError') console.error('Error al compartir:', err); }
+    });
+  }
+
   // Guardar cambios del formulario de edición
   DOM.editForm.addEventListener('submit', (e) => {
     e.preventDefault();
@@ -1838,7 +1964,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Cerrar modales haciendo clic en el backdrop oscuro
-  [DOM.searchModal, DOM.editModal, DOM.manualModal, DOM.apiKeyModal].forEach(modal => {
+  [DOM.searchModal, DOM.editModal, DOM.previewModal, DOM.manualModal, DOM.apiKeyModal].forEach(modal => {
     if (!modal) return;
     modal.addEventListener('click', (e) => {
       if (e.target === modal) {
@@ -1900,6 +2026,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // Abrimos el buscador y lanzamos la búsqueda
     openSearchModal();
     DOM.apiSearchInput.value = shareQuery;
-    handleApiSearch();
+    handleApiSearch().then(() => {
+      // Auto-abrir la vista previa del primer resultado
+      if (state.apiSearchResults && state.apiSearchResults.length > 0) {
+        openPreviewModal(state.apiSearchResults[0]);
+      }
+    });
   }
 });

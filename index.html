@@ -167,7 +167,7 @@
             <!-- Idioma -->
             <div class="py-2">
               <span class="px-3 text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5" data-i18n="menu.language">Idioma</span>
-              <div class="grid grid-cols-3 gap-1.5 px-1" role="group" aria-label="Idioma / Language / Język">
+              <div class="grid grid-cols-3 gap-1.5 px-1" role="group" aria-label="Idioma / Language / JÄ™zyk">
 
                 <!-- Español -->
                 <button type="button" data-lang="es" title="Español" aria-pressed="false" class="lang-btn flex flex-col items-center gap-1.5 px-1 py-2 rounded-xl border text-[11px] font-semibold transition-colors cursor-pointer border-transparent text-slate-300 hover:bg-slate-800 hover:text-white">
@@ -355,7 +355,7 @@
         <option value="watching" data-i18n="statusSel.watching">Estado: Viendo</option>
         <option value="plan_to_watch" data-i18n="statusSel.plan">Estado: Por ver</option>
         <option value="completed" data-i18n="statusSel.completed">Estado: Completadas</option>
-        <option value="favorites" data-i18n="statusSel.favorites">❤ Favoritas</option>
+        <option value="favorites" data-i18n="statusSel.favorites">â¤ Favoritas</option>
       </select>
     </div>
 
@@ -714,6 +714,64 @@
   <!-- ========================================== -->
   <!-- MODAL: AÑADIR MANUALMENTE                 -->
   <!-- ========================================== -->
+  <!-- ========================================== -->
+  <!-- MODAL: VISTA PREVIA DE BÚSQUEDA            -->
+  <!-- ========================================== -->
+  <div id="previewModal" class="fixed inset-0 z-[60] bg-black/80 backdrop-blur-md hidden flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="glass-panel w-full max-w-2xl max-h-[92vh] sm:max-h-[90vh] rounded-t-3xl sm:rounded-3xl flex flex-col shadow-2xl overflow-hidden border border-slate-700/80 animate-fade-in">
+      
+      <div class="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between">
+        <h3 class="font-bold text-white text-base">Vista Previa</h3>
+        <button id="closePreviewModalBtn" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-all">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+
+      <div class="p-4 sm:p-6 overflow-y-auto flex-grow overscroll-contain">
+        
+        <div class="mb-6">
+          <div class="flex gap-4">
+            <img id="previewPosterImg" src="" alt="Portada" class="w-24 h-36 object-cover rounded-xl shadow-lg bg-slate-800 shrink-0" onerror="window.API_SERVICE && API_SERVICE.handleImgError(this, 'movie')" />
+            <div class="min-w-0 flex flex-col w-full">
+              <div class="flex flex-wrap items-center gap-x-2 gap-y-1 mb-1">
+                <span id="previewTypeBadge" class="text-xs font-bold uppercase tracking-wider text-white px-2 py-0.5 rounded"></span>
+                <span id="previewYear" class="text-xs text-slate-400 font-medium"></span>
+                <span id="previewDurationBadge" class="text-xs text-slate-400 font-medium"></span>
+              </div>
+              <h4 id="previewTitle" class="text-lg font-black text-white leading-tight mb-2"></h4>
+              <div class="flex flex-wrap gap-2 mt-auto">
+                <button type="button" id="previewAddBtn" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs px-4 py-2 rounded-xl shadow-lg shadow-amber-500/20 transition-all flex items-center gap-1.5 w-full sm:w-auto justify-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                  Añadir a mi lista
+                </button>
+                <button type="button" id="previewShareBtn" class="bg-slate-700 hover:bg-slate-600 text-white font-bold text-xs px-3 py-2 rounded-xl transition-all flex items-center gap-1.5 sm:w-auto justify-center" title="Compartir">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <p id="previewSummary" class="text-xs text-slate-400 mt-4 leading-relaxed"></p>
+
+          <div id="previewCastRow" class="hidden mt-4 pt-4 border-t border-slate-800/70 space-y-2">
+            <p id="previewDirectorLine" class="text-xs text-slate-300"></p>
+            <p id="previewCastLine" class="text-xs text-slate-400 leading-relaxed"></p>
+          </div>
+          
+          <div class="mt-4 pt-4 border-t border-slate-800/70">
+            <label class="block text-xs font-semibold text-slate-400 mb-2">Estado al añadir</label>
+            <select id="previewStatusSelect" class="w-full bg-slate-900 text-white text-xs p-3 rounded-xl border border-slate-700 focus:outline-none focus:border-amber-500 appearance-none">
+              <option value="plan_to_watch">Quiero verla (Pendiente)</option>
+              <option value="watching">Viendo ahora</option>
+              <option value="completed">Completada</option>
+            </select>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div id="manualModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md hidden flex items-end sm:items-center justify-center p-0 sm:p-4">
     <div class="glass-panel w-full max-w-lg max-h-[92vh] sm:max-h-none rounded-t-3xl sm:rounded-3xl flex flex-col shadow-2xl overflow-hidden border border-slate-700/80 animate-fade-in">
       <div class="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between">
@@ -824,10 +882,10 @@
             id="apiKeyInput" 
             autocomplete="off" 
             spellcheck="false"
-            placeholder="32 caracteres, por ejemplo 8f2a1c4d…" 
+            placeholder="32 caracteres, por ejemplo 8f2a1c4dâ€¦" 
             class="w-full bg-slate-900 text-white text-xs px-3.5 py-2.5 rounded-xl border border-slate-700 focus:outline-none focus:border-sky-500 font-mono" data-i18n-placeholder="apiKey.placeholder"/>
           <span id="apiKeyHint" class="text-[10px] text-slate-500 mt-1 block" data-i18n="apiKey.hint">
-            La consigues en themoviedb.org → Ajustes → API. Es la clave corta, no el token largo que empieza por eyJ.
+            La consigues en themoviedb.org â†’ Ajustes â†’ API. Es la clave corta, no el token largo que empieza por eyJ.
           </span>
         </div>
 
@@ -880,4 +938,5 @@
   </script>
 </body>
 </html>
+
 

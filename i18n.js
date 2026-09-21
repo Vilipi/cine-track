@@ -174,8 +174,8 @@
   add('search.error', 'Error al consultar la API de portadas.', 'Error while querying the covers API.', 'Błąd podczas pobierania okładek z API.');
   add('result.directedBy', 'Dirigida por', 'Directed by', 'Reżyseria:');
   add('result.with', 'Con', 'With', 'Występuje:');
-  add('result.cast', 'Reparto:', 'Cast:', 'Obsada:');
-  add('result.added', 'Añadido', 'Added', 'Dodano');
+  add('search.addBtn', 'Añadir', 'Add', 'Dodaj');
+  add('result.added','Añadido', 'Added', 'Dodano');
   add('action.add', 'Añadir', 'Add', 'Dodaj');
 
   add('offline.title', 'Sin conexión a internet', 'No internet connection', 'Brak połączenia z internetem');

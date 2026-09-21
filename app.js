@@ -141,6 +141,41 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ==========================================
+  // PWA & NAVEGACIÓN (Hardware Back Button)
+  // ==========================================
+  let isModalOpen = false;
+
+  function pushModalState() {
+    if (!isModalOpen) {
+      history.pushState({ modalOpen: true }, '');
+      isModalOpen = true;
+    }
+  }
+
+  function popModalState() {
+    if (isModalOpen) {
+      isModalOpen = false;
+      if (history.state && history.state.modalOpen) {
+        history.back();
+      }
+    }
+  }
+
+  function closeAllModals() {
+    [DOM.searchModal, DOM.editModal, DOM.manualModal, DOM.apiKeyModal].forEach(m => {
+      if (m) m.classList.add('hidden');
+    });
+    if (typeof closeOptionsMenu === 'function') closeOptionsMenu();
+  }
+
+  window.addEventListener('popstate', () => {
+    if (isModalOpen) {
+      isModalOpen = false;
+      closeAllModals();
+    }
+  });
+
+  // ==========================================
   // NOTIFICACIONES TOAST
   // ==========================================
   function showToast(message, type = 'success') {
@@ -742,15 +777,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function openApiKeyModal() {
     if (!DOM.apiKeyModal) return;
-    closeOptionsMenu();
+    if (typeof closeOptionsMenu === 'function') closeOptionsMenu();
     DOM.apiKeyInput.value = API_SERVICE.getTmdbKey();
     refreshApiKeyUI();
     DOM.apiKeyModal.classList.remove('hidden');
+    pushModalState();
     setTimeout(() => DOM.apiKeyInput.focus(), 100);
   }
 
   function closeApiKeyModal() {
     if (DOM.apiKeyModal) DOM.apiKeyModal.classList.add('hidden');
+    popModalState();
   }
 
   // ==========================================
@@ -787,11 +824,13 @@ document.addEventListener('DOMContentLoaded', () => {
     DOM.apiSearchResults.innerHTML = '';
     DOM.apiSearchEmpty.classList.remove('hidden');
     DOM.apiSearchLoading.classList.add('hidden');
+    pushModalState();
     setTimeout(() => DOM.apiSearchInput.focus(), 100);
   }
 
   function closeSearchModal() {
     DOM.searchModal.classList.add('hidden');
+    popModalState();
   }
 
   async function handleApiSearch() {
@@ -1376,11 +1415,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     DOM.editModal.classList.remove('hidden');
+    pushModalState();
   }
 
   function closeEditModal() {
     DOM.editModal.classList.add('hidden');
     state.activeModalItem = null;
+    popModalState();
   }
 
   // Guardar cambios del formulario de edición
@@ -1465,10 +1506,12 @@ document.addEventListener('DOMContentLoaded', () => {
   function openManualModal() {
     DOM.manualForm.reset();
     DOM.manualModal.classList.remove('hidden');
+    pushModalState();
   }
 
   function closeManualModal() {
     DOM.manualModal.classList.add('hidden');
+    popModalState();
   }
 
   DOM.manualForm.addEventListener('submit', (e) => {
@@ -1765,9 +1808,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Cerrar modales haciendo clic en el backdrop oscuro
   [DOM.searchModal, DOM.editModal, DOM.manualModal, DOM.apiKeyModal].forEach(modal => {
+    if (!modal) return;
     modal.addEventListener('click', (e) => {
       if (e.target === modal) {
         modal.classList.add('hidden');
+        popModalState();
       }
     });
   });
@@ -1775,11 +1820,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // Tecla Escape para cerrar modales o dropdowns
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
-      DOM.searchModal.classList.add('hidden');
-      DOM.editModal.classList.add('hidden');
-      DOM.manualModal.classList.add('hidden');
-      if (DOM.apiKeyModal) DOM.apiKeyModal.classList.add('hidden');
-      closeOptionsMenu();
+      closeAllModals();
+      popModalState();
     }
   });
 

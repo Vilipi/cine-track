@@ -241,7 +241,6 @@ body {
   /* Los modales se comportan como hojas inferiores: sin sombra lateral
      y pegados al borde de la pantalla */
   #searchModal .glass-panel,
-  #previewModal .glass-panel,
   #editModal .glass-panel,
   #manualModal .glass-panel,
   #apiKeyModal .glass-panel {
@@ -252,6 +251,12 @@ body {
     max-height: 92vh;
     max-height: 92dvh;
     max-width: 100%;
+  }
+
+  /* La vista previa va centrada en pantalla, no pegada abajo */
+  #previewModal .glass-panel {
+    max-height: 90vh;
+    max-height: 90dvh;
   }
 
   /* Evita que textos largos ensanchen el contenido del modal */

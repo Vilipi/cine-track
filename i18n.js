@@ -105,6 +105,10 @@
     { one: 'Se importó {n} título con éxito.', other: 'Se importaron {n} títulos con éxito.' },
     { one: 'Imported {n} title successfully.', other: 'Imported {n} titles successfully.' },
     { one: 'Zaimportowano {n} tytuł.', few: 'Zaimportowano {n} tytuły.', many: 'Zaimportowano {n} tytułów.', other: 'Zaimportowano {n} tytułów.' });
+  add('count.newEpisodes',
+    { one: '{n} episodio nuevo', other: '{n} episodios nuevos' },
+    { one: '{n} new episode', other: '{n} new episodes' },
+    { one: '{n} nowy odcinek', few: '{n} nowe odcinki', many: '{n} nowych odcinków', other: '{n} nowych odcinków' });
   add('series.ofGenre',
     { one: '{n} serie de {genre}', other: '{n} series de {genre}' },
     { one: '{n} {genre} series', other: '{n} {genre} series' },

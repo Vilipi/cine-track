@@ -558,8 +558,11 @@ document.addEventListener('DOMContentLoaded', () => {
     let quickActionBtn = '';
 
     if (!isMovie) {
-      const currentEp = (item.watchedEpisodes && item.watchedEpisodes.length > 0) 
-        ? item.watchedEpisodes.length 
+      const watchedKeys = new Set(item.watchedEpisodes || []);
+      const currentEp = (item.watchedEpisodes && item.watchedEpisodes.length > 0)
+        ? (item.episodesList && item.episodesList.length > 0
+            ? item.episodesList.filter(ep => watchedKeys.has(`${ep.season}_${ep.number}`)).length
+            : item.watchedEpisodes.length)
         : (item.currentEpisode || 0);
       const totalEp = item.totalEpisodes || (item.episodesList ? item.episodesList.length : 10);
       const percent = totalEp > 0 ? Math.min(100, Math.round((currentEp / totalEp) * 100)) : 0;
@@ -981,18 +984,9 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
               const episodes = await API_SERVICE.getShowEpisodes(item.originalId);
               if (episodes && episodes.length > 0) {
-                totalEpisodes = episodes.length;
-                const maxSeason = Math.max(...episodes.map(ep => ep.season || 1));
-                totalSeasons = maxSeason || 1;
-                episodesList = episodes.map(ep => ({
-                  id: ep.id,
-                  season: ep.season || 1,
-                  number: ep.number || 1,
-                  name: ep.name || '',
-                  runtime: ep.runtime || item.episodeDuration || 45,
-                  airdate: ep.airdate || null,
-                  summary: API_SERVICE.stripHtml(ep.summary)
-                }));
+                episodesList = mapApiEpisodes(episodes, item.episodeDuration);
+                totalEpisodes = episodesList.length;
+                totalSeasons = Math.max(1, ...episodesList.map(ep => ep.season));
               }
             } catch (e) {
               console.warn('No se pudieron obtener episodios detallados:', e);
@@ -1070,26 +1064,86 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Obtiene episodios guardados o los descarga de TVMaze API
+  // Convierte los episodios de la API a la lista interna. Se descartan los
+  // especiales, tráilers y extras (la API no les da número de episodio) y los
+  // duplicados, para que no cuenten como "pendientes" en el progreso.
+  function mapApiEpisodes(rawEps, fallbackRuntime) {
+    const seen = new Set();
+    const list = [];
+    (rawEps || []).forEach(ep => {
+      if (ep.number == null) return;
+      const season = ep.season || 1;
+      const key = `${season}_${ep.number}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      list.push({
+        id: ep.id,
+        season,
+        number: ep.number,
+        name: ep.name || '',
+        runtime: ep.runtime || fallbackRuntime || 45,
+        airdate: ep.airdate || null,
+        summary: API_SERVICE.stripHtml(ep.summary)
+      });
+    });
+    return list;
+  }
+
+  // Identificador de la serie en la API (TVMaze o "tmdb:<id>")
+  function getSeriesApiId(item) {
+    return item.originalId || (item.apiId && String(item.apiId).startsWith('tvmaze_') ? String(item.apiId).replace('tvmaze_', '') : null);
+  }
+
+  // Vuelve a consultar la API y añade los episodios nuevos a una serie ya guardada.
+  // Conserva lo que el usuario ya marcó como visto. Devuelve cuántos episodios
+  // nuevos ya emitidos se han encontrado.
+  const EPISODE_SYNC_INTERVAL = 6 * 60 * 60 * 1000;
+  async function syncSeriesEpisodes(item) {
+    const showId = getSeriesApiId(item);
+    if (!showId || !item.episodesList || item.episodesList.length === 0) return 0;
+    if (item.episodesSyncedAt && Date.now() - item.episodesSyncedAt < EPISODE_SYNC_INTERVAL) return 0;
+
+    let fresh;
+    try {
+      fresh = mapApiEpisodes(await API_SERVICE.getShowEpisodes(showId), item.episodeDuration);
+    } catch (err) {
+      console.warn('No se pudieron comprobar episodios nuevos:', err);
+      return 0;
+    }
+    if (!fresh || fresh.length === 0) return 0;
+
+    const known = new Set(item.episodesList.map(ep => `${ep.season}_${ep.number}`));
+    const today = new Date().toISOString().slice(0, 10);
+    const added = fresh.filter(ep => !known.has(`${ep.season}_${ep.number}`));
+    const newlyAired = added.filter(ep => ep.airdate && ep.airdate <= today).length;
+
+    const updates = {
+      episodesSyncedAt: Date.now(),
+      episodesList: fresh,
+      totalEpisodes: fresh.length,
+      totalSeasons: Math.max(1, ...fresh.map(ep => ep.season))
+    };
+    // Una serie completada con episodios nuevos ya emitidos vuelve a "Viendo"
+    if (newlyAired > 0 && item.status === 'completed') {
+      updates.status = 'watching';
+      updates.manualComplete = false;
+    }
+    Object.assign(item, STORAGE_SERVICE.updateItem(item.id, updates) || updates);
+    return newlyAired;
+  }
+
   async function getOrFetchItemEpisodes(item) {
     if (item.episodesList && Array.isArray(item.episodesList) && item.episodesList.length > 0) {
       return item.episodesList;
     }
 
-    const showId = item.originalId || (item.apiId && String(item.apiId).startsWith('tvmaze_') ? String(item.apiId).replace('tvmaze_', '') : null);
+    const showId = getSeriesApiId(item);
     if (showId) {
       try {
         const rawEps = await API_SERVICE.getShowEpisodes(showId);
         if (rawEps && rawEps.length > 0) {
-          const episodesList = rawEps.map(ep => ({
-            id: ep.id,
-            season: ep.season || 1,
-            number: ep.number || 1,
-            name: ep.name || '',
-            runtime: ep.runtime || item.episodeDuration || 45,
-            airdate: ep.airdate || null,
-            summary: API_SERVICE.stripHtml(ep.summary)
-          }));
-          const maxSeason = Math.max(...episodesList.map(e => e.season || 1));
+          const episodesList = mapApiEpisodes(rawEps, item.episodeDuration);
+          const maxSeason = Math.max(1, ...episodesList.map(e => e.season));
           item.episodesList = episodesList;
           item.totalEpisodes = episodesList.length;
           item.totalSeasons = maxSeason || 1;
@@ -1151,6 +1205,15 @@ document.addEventListener('DOMContentLoaded', () => {
     await getOrFetchItemEpisodes(item);
     ensureItemWatchedEpisodes(item);
 
+    const newEpisodes = await syncSeriesEpisodes(item);
+    if (newEpisodes > 0) {
+      state.activeModalItem = item;
+      document.getElementById('editStatus').value = item.status;
+      document.getElementById('editTotalEpisodes').value = item.totalEpisodes || 1;
+      renderLibrary();
+      showToast(`${item.title}: ${tp('count.newEpisodes', newEpisodes)}`);
+    }
+
     // Calcular qué temporada abrir inicialmente
     let initialSeason = 1;
     if (item.episodesList && item.episodesList.length > 0) {
@@ -1190,7 +1253,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const watchedSet = new Set(item.watchedEpisodes || []);
     const totalEpisodes = item.episodesList.length;
-    const totalWatched = watchedSet.size;
+    const totalWatched = item.episodesList.filter(ep => watchedSet.has(`${ep.season}_${ep.number}`)).length;
     const percent = totalEpisodes > 0 ? Math.min(100, Math.round((totalWatched / totalEpisodes) * 100)) : 0;
 
     // 1. Encabezado de progreso general
@@ -1583,6 +1646,7 @@ document.addEventListener('DOMContentLoaded', () => {
       updates.currentSeason = parseInt(document.getElementById('editCurrentSeason').value) || 1;
       updates.currentEpisode = parseInt(document.getElementById('editCurrentEpisode').value) || 0;
       updates.totalEpisodes = parseInt(document.getElementById('editTotalEpisodes').value) || 1;
+      updates.manualComplete = updates.status === 'completed';
       if (state.activeModalItem.watchedEpisodes) {
         updates.watchedEpisodes = state.activeModalItem.watchedEpisodes;
       }

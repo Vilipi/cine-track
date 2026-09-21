@@ -314,6 +314,8 @@ const STORAGE_SERVICE = {
 
     if (newCount >= totalEp && totalEp > 0) {
       updates.status = 'completed';
+    } else if (item.manualComplete && item.status === 'completed' && newCount > 0) {
+      // Completada a mano: marcar o desmarcar episodios no cambia el estado
     } else if (newCount > 0) {
       if (item.status === 'plan_to_watch' || item.status === 'completed') {
         updates.status = 'watching';
@@ -362,6 +364,8 @@ const STORAGE_SERVICE = {
 
     if (newCount >= totalEp && totalEp > 0) {
       updates.status = 'completed';
+    } else if (item.manualComplete && item.status === 'completed' && newCount > 0) {
+      // Completada a mano: no se cambia el estado
     } else if (newCount > 0) {
       if (item.status === 'plan_to_watch' || item.status === 'completed') {
         updates.status = 'watching';
@@ -401,7 +405,8 @@ const STORAGE_SERVICE = {
       return this.updateItem(id, {
         watchedEpisodes: [],
         currentEpisode: 0,
-        status: 'plan_to_watch'
+        status: 'plan_to_watch',
+        manualComplete: false
       });
     }
   },

@@ -943,13 +943,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 <span>${item.matchedRole === 'Director' ? t('result.directedBy') : t('result.with')} ${item.matchedPerson}</span>
               </p>
             ` : ''}
-            <div class="flex items-center gap-2 mt-2">
-              <select id="statusSelect_${index}" class="bg-slate-900 text-slate-300 text-[11px] px-2 py-1.5 rounded-lg border border-slate-700/60 focus:outline-none focus:border-amber-500 appearance-none max-w-[140px] truncate">
+            <div class="flex flex-wrap items-center gap-2 mt-2">
+              <select id="statusSelect_${index}" class="bg-slate-900 text-slate-300 text-[11px] px-2 py-1.5 rounded-lg border border-slate-700/60 focus:outline-none focus:border-amber-500 appearance-none min-w-0 flex-1 sm:flex-none sm:max-w-[140px] truncate">
                 <option value="plan_to_watch">${t('manualStatus.plan') || 'Quiero verla'}</option>
                 <option value="watching">${t('manualStatus.watching') || 'Viendo ahora'}</option>
                 <option value="completed">${t('editStatus.completed') || 'Completada'}</option>
               </select>
-              <button data-add-index="${index}" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-[11px] px-3 py-1.5 rounded-lg shadow-lg shadow-amber-500/20 transition-all flex items-center gap-1.5 shrink-0" data-i18n="search.addBtn">
+              <button data-add-index="${index}" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-[11px] px-3 py-1.5 rounded-lg shadow-lg shadow-amber-500/20 transition-all flex items-center gap-1.5 shrink-0">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                 ${t('search.addBtn')}
               </button>

@@ -241,10 +241,23 @@ body {
   /* Los modales se comportan como hojas inferiores: sin sombra lateral
      y pegados al borde de la pantalla */
   #searchModal .glass-panel,
+  #previewModal .glass-panel,
   #editModal .glass-panel,
-  #manualModal .glass-panel {
+  #manualModal .glass-panel,
+  #apiKeyModal .glass-panel {
     border-bottom: none;
     padding-bottom: env(safe-area-inset-bottom);
+    /* 100vh en móvil incluye la barra del navegador y el modal se sale;
+       dvh usa la altura realmente visible */
+    max-height: 92vh;
+    max-height: 92dvh;
+    max-width: 100%;
+  }
+
+  /* Evita que textos largos ensanchen el contenido del modal */
+  #previewModal h4,
+  #previewModal p {
+    overflow-wrap: anywhere;
   }
 
   /* El aviso flotante no debe tapar la barra de gestos */

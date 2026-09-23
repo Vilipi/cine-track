@@ -238,6 +238,10 @@ document.addEventListener('DOMContentLoaded', () => {
     renderStats();
     const allItems = STORAGE_SERVICE.getItems();
 
+    // Va por su cuenta en segundo plano; se lanza aquí arriba porque el
+    // estado vacío corta la función antes de llegar al final
+    fillMissingRatings().catch(() => {});
+
     // 1. Filtrar por estado
     let filteredItems = allItems;
     if (state.statusFilter === 'watching') {
@@ -450,48 +454,68 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
       DOM.moviesSection.classList.add('hidden');
     }
-
-    fillMissingRatings(filteredItems).catch(() => {});
   }
 
   // Tope de notas que se rellenan por tanda y por sesión. Los títulos que ya
   // estaban en la lista antes de configurar OMDb (o los importados de una
   // copia) se van completando poco a poco, sin vaciar la cuota diaria de golpe.
   const LIBRARY_RATINGS_BATCH = 6;
-  const LIBRARY_RATINGS_SESSION_MAX = 60;
+  const LIBRARY_RATINGS_SESSION_MAX = 120;
   const ratingsAttempted = new Set();
+  let ratingsFillRunning = false;
 
   /**
-   * Busca las notas que falten en los títulos ya guardados y las persiste.
-   * Cada ítem se intenta una sola vez por sesión: si OMDb no lo conoce, no se
+   * Completa las notas que falten en la biblioteca: los títulos que ya
+   * estaban guardados antes de configurar OMDb, o los importados de una copia.
+   *
+   * Recorre la lista entera en tandas, no de una vez, para no lanzar cien
+   * peticiones a la vez ni vaciar la cuota diaria de OMDb de golpe. Cada
+   * título se intenta una sola vez por sesión: si OMDb no lo conoce, no se
    * vuelve a preguntar hasta recargar la app.
    */
-  async function fillMissingRatings(items) {
+  async function fillMissingRatings() {
     if (!API_SERVICE.hasOmdbKey() || navigator.onLine === false) return;
-    if (ratingsAttempted.size >= LIBRARY_RATINGS_SESSION_MAX) return;
+    // renderLibrary vuelve a llamar aquí al repintar; una sola pasada basta
+    if (ratingsFillRunning) return;
 
-    const pending = (items || [])
-      .filter(item => !item.ratings && !ratingsAttempted.has(item.id))
-      .slice(0, LIBRARY_RATINGS_BATCH);
-    if (pending.length === 0) return;
+    ratingsFillRunning = true;
+    try {
+      while (ratingsAttempted.size < LIBRARY_RATINGS_SESSION_MAX) {
+        // Se relee de almacenamiento en cada vuelta: la tanda anterior ya guardó
+        const pending = STORAGE_SERVICE.getItems()
+          .filter(item => !item.ratings && !ratingsAttempted.has(item.id))
+          .slice(0, LIBRARY_RATINGS_BATCH);
+        if (pending.length === 0) break;
 
-    pending.forEach(item => ratingsAttempted.add(item.id));
+        pending.forEach(item => ratingsAttempted.add(item.id));
 
-    const results = await Promise.all(
-      pending.map(item => API_SERVICE.getRatings(item).catch(() => null))
-    );
+        const results = await Promise.all(
+          pending.map(async item => {
+            const ratings = await API_SERVICE.getRatings(item).catch(() => null);
+            // El id se guarda aunque OMDb no tenga nota, para no volver a
+            // preguntárselo a TMDB o TVMaze en la próxima sesión
+            const imdbId = await API_SERVICE.resolveImdbId(item).catch(() => null);
+            return { ratings, imdbId };
+          })
+        );
 
-    let saved = 0;
-    results.forEach((data, index) => {
-      if (!data) return;
-      // Se guarda también el id de IMDb: la próxima consulta será exacta
-      if (STORAGE_SERVICE.updateItem(pending[index].id, { ratings: data, imdbId: data.imdbId || pending[index].imdbId || null })) {
-        saved++;
+        let pintadas = 0;
+        results.forEach(({ ratings, imdbId }, index) => {
+          const item = pending[index];
+          const updates = {};
+          if (ratings) updates.ratings = ratings;
+          if (imdbId && imdbId !== item.imdbId) updates.imdbId = imdbId;
+          if (Object.keys(updates).length === 0) return;
+
+          if (STORAGE_SERVICE.updateItem(item.id, updates) && ratings) pintadas++;
+        });
+
+        // Solo se repinta si hay insignias nuevas que mostrar
+        if (pintadas > 0) renderLibrary();
       }
-    });
-
-    // Repintar arrastra la siguiente tanda: la lista se completa sola
-    if (saved > 0) renderLibrary();
+    } finally {
+      ratingsFillRunning = false;
+    }
   }
 
   // ==========================================
@@ -990,10 +1014,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (item.ratings) return;
 
     API_SERVICE.getRatings(item).then(data => {
-      if (!data || state.activeModalItem !== item) return;
+      if (!data) return;
       item.ratings = data;
       STORAGE_SERVICE.updateItem(item.id, { ratings: data, imdbId: data.imdbId || item.imdbId || null });
-      renderRatingsInto(DOM.editRatings, data);
+      // Solo se pinta si la ficha sigue abierta sobre este mismo título,
+      // pero el dato se guarda igualmente
+      if (state.activeModalItem === item) renderRatingsInto(DOM.editRatings, data);
     }).catch(() => {});
   }
 

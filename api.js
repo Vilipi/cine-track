@@ -38,6 +38,8 @@ const API_SERVICE = {
   _tmdbKeyWarned: false,
   _omdbCache: null,
   _omdbPending: new Map(),
+  _imdbIdCache: new Map(),
+  _imdbIdPending: new Map(),
 
   // Limpia etiquetas HTML que TVMaze suele incluir en la sinopsis
   stripHtml(html) {
@@ -451,6 +453,88 @@ const API_SERVICE = {
     return entry ? entry.data : null;
   },
 
+  // Identifica de qué API vino un título ya guardado, para poder volver a
+  // preguntarle por su id de IMDb
+  _sourceKey(item) {
+    if (!item) return null;
+    if (item.apiId) return String(item.apiId);
+    if (item.originalId !== undefined && item.originalId !== null) return `orig:${item.originalId}`;
+    return null;
+  },
+
+  /**
+   * Averigua el id de IMDb de un título que no lo tenga guardado.
+   *
+   * Hace falta porque los títulos añadidos antes de esta función no lo
+   * guardaron, y buscarlos en OMDb por el nombre no funciona: TMDB devuelve
+   * los títulos traducidos al idioma de la app ("El hobbit: La desolación de
+   * Smaug") y OMDb solo entiende el original. Con el id de la API de origen
+   * la consulta es exacta.
+   */
+  async resolveImdbId(item) {
+    if (!item) return null;
+    if (item.imdbId) return item.imdbId;
+
+    const source = this._sourceKey(item);
+    if (!source) return null;
+
+    if (this._imdbIdCache.has(source)) return this._imdbIdCache.get(source);
+    if (this._imdbIdPending.has(source)) return this._imdbIdPending.get(source);
+
+    const request = this._fetchImdbId(item)
+      .catch(error => {
+        console.warn('No se pudo averiguar el id de IMDb:', error.message || error);
+        return null;
+      })
+      .then(id => {
+        this._imdbIdCache.set(source, id);
+        this._imdbIdPending.delete(source);
+        return id;
+      });
+
+    this._imdbIdPending.set(source, request);
+    return request;
+  },
+
+  async _fetchImdbId(item) {
+    const apiId = String(item.apiId || '');
+    const originalId = item.originalId;
+
+    // Películas de TMDB: apiId "tmdb_<id>"
+    if (apiId.startsWith('tmdb_')) {
+      return await this._tmdbExternalImdbId('movie', apiId.slice(5));
+    }
+
+    // Series de TMDB: apiId "tmdbtv_<id>" u originalId "tmdb:<id>"
+    if (apiId.startsWith('tmdbtv_')) {
+      return await this._tmdbExternalImdbId('tv', apiId.slice(7));
+    }
+    if (typeof originalId === 'string' && originalId.startsWith('tmdb:')) {
+      return await this._tmdbExternalImdbId('tv', originalId.slice(5));
+    }
+
+    // Series de TVMaze: apiId "tvmaze_<id>", o un originalId numérico
+    let tvmazeId = null;
+    if (apiId.startsWith('tvmaze_')) {
+      tvmazeId = apiId.slice(7);
+    } else if (originalId !== undefined && originalId !== null && /^\d+$/.test(String(originalId))) {
+      tvmazeId = String(originalId);
+    }
+    if (tvmazeId) {
+      const show = await this.fetchJson(`https://api.tvmaze.com/shows/${tvmazeId}`, { timeout: 6000, retries: 0 });
+      return show?.externals?.imdb || null;
+    }
+
+    // Títulos añadidos a mano: no hay de dónde sacarlo
+    return null;
+  },
+
+  async _tmdbExternalImdbId(kind, id) {
+    if (!this.hasTmdbKey()) return null;
+    const data = await this.fetchJson(this.tmdbUrl(`/${kind}/${id}/external_ids`), { timeout: 6000, retries: 0 });
+    return data?.imdb_id || null;
+  },
+
   /**
    * Notas de IMDb y Metacritic de una película o serie.
    * Devuelve { imdb, imdbVotes, metascore, imdbId } o null si OMDb no la
@@ -458,8 +542,15 @@ const API_SERVICE = {
    * adorno, no puede romper una búsqueda.
    */
   async getRatings(item) {
-    const cacheKey = this.omdbCacheKey(item);
-    if (!cacheKey || !this.hasOmdbKey()) return null;
+    if (!item || !this.hasOmdbKey()) return null;
+
+    // Se resuelve el id antes de nada: de él depende la clave de caché y que
+    // la consulta a OMDb sea exacta en vez de por título traducido
+    const imdbId = item.imdbId || await this.resolveImdbId(item);
+    const target = imdbId ? { ...item, imdbId } : item;
+
+    const cacheKey = this.omdbCacheKey(target);
+    if (!cacheKey) return null;
 
     const cache = this._loadOmdbCache();
     if (cache.has(cacheKey)) return cache.get(cacheKey).data;
@@ -467,7 +558,7 @@ const API_SERVICE = {
     // Dos tarjetas del mismo título no deben lanzar dos peticiones
     if (this._omdbPending.has(cacheKey)) return this._omdbPending.get(cacheKey);
 
-    const request = this._fetchOmdb(item)
+    const request = this._fetchOmdb(target)
       .catch(error => {
         console.warn('OMDb no respondió, se muestra sin nota:', error.message || error);
         return null;

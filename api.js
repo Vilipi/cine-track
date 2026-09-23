@@ -16,12 +16,28 @@
  */
 const TMDB_KEY_STORAGE = 'cinetrack_tmdb_key';
 
+/**
+ * OMDb es la única API pública que publica a la vez la nota de IMDb y el
+ * Metascore de Metacritic. También pide una clave gratuita, que se guarda
+ * igual que la de TMDB: solo en el navegador.
+ */
+const OMDB_KEY_STORAGE = 'cinetrack_omdb_key';
+const OMDB_CACHE_STORAGE = 'cinetrack_omdb_cache';
+
+// El plan gratuito de OMDb son 1.000 peticiones al día, así que las notas se
+// guardan una semana: cambian poco y así no se gasta cuota repitiendo búsquedas.
+const OMDB_CACHE_TTL = 7 * 24 * 60 * 60 * 1000;
+const OMDB_CACHE_MAX = 400;
+
 const API_SERVICE = {
   TMDB_BASE: 'https://api.themoviedb.org/3',
   TMDB_IMG: 'https://image.tmdb.org/t/p',
+  OMDB_BASE: 'https://www.omdbapi.com/',
   _tmdbGenreCache: null,
   _tmdbGenreLang: null,
   _tmdbKeyWarned: false,
+  _omdbCache: null,
+  _omdbPending: new Map(),
 
   // Limpia etiquetas HTML que TVMaze suele incluir en la sinopsis
   stripHtml(html) {
@@ -293,6 +309,9 @@ const API_SERVICE = {
         status: detail?.status || 'Released',
         summary: movie.overview || detail?.overview || '',
         rating: movie.vote_average ? Number(movie.vote_average).toFixed(1) : null,
+        // La ficha de TMDB ya trae el id de IMDb: con él la consulta a OMDb
+        // es exacta y no depende de que el título coincida letra por letra.
+        imdbId: detail?.imdb_id || null,
         director: director,
         cast: cast,
         durationMinutes: runtime,
@@ -332,6 +351,9 @@ const API_SERVICE = {
           status: 'Unknown',
           summary: show.overview || '',
           rating: show.vote_average ? Number(show.vote_average).toFixed(1) : null,
+          // La búsqueda de TV de TMDB no devuelve ids externos: OMDb tendrá
+          // que buscar esta serie por título y año.
+          imdbId: null,
           duration: null,
           episodeDuration: 45,
           network: 'TV/Streaming',
@@ -344,6 +366,172 @@ const API_SERVICE = {
       console.warn('TMDB tampoco pudo buscar series:', error.message || error);
       return [];
     }
+  },
+
+  // ─────────────────── OMDb (notas de IMDb y Metacritic) ───────────────────
+
+  getOmdbKey() {
+    try {
+      return (localStorage.getItem(OMDB_KEY_STORAGE) || '').trim();
+    } catch (e) {
+      return '';
+    }
+  },
+
+  setOmdbKey(key) {
+    const clean = (key || '').trim();
+    try {
+      if (clean) {
+        localStorage.setItem(OMDB_KEY_STORAGE, clean);
+      } else {
+        localStorage.removeItem(OMDB_KEY_STORAGE);
+      }
+      return true;
+    } catch (e) {
+      console.warn('No se pudo guardar la clave de OMDb:', e.message || e);
+      return false;
+    }
+  },
+
+  // A diferencia de TMDB, aquí no se avisa por consola: las notas son un
+  // extra y la app funciona igual sin clave.
+  hasOmdbKey() {
+    return this.getOmdbKey().length > 0;
+  },
+
+  /**
+   * Caché de notas en el navegador. Se carga una sola vez por sesión y se
+   * descartan de paso las entradas caducadas.
+   */
+  _loadOmdbCache() {
+    if (this._omdbCache) return this._omdbCache;
+    this._omdbCache = new Map();
+    try {
+      const raw = localStorage.getItem(OMDB_CACHE_STORAGE);
+      if (raw) {
+        const now = Date.now();
+        Object.entries(JSON.parse(raw)).forEach(([key, entry]) => {
+          if (entry && now - entry.at < OMDB_CACHE_TTL) this._omdbCache.set(key, entry);
+        });
+      }
+    } catch (e) {
+      // Caché corrupta o localStorage bloqueado: se empieza de cero
+    }
+    return this._omdbCache;
+  },
+
+  _saveOmdbCache() {
+    if (!this._omdbCache) return;
+    try {
+      // Se conservan las más recientes para que la caché no crezca sin límite
+      const entries = [...this._omdbCache.entries()]
+        .sort((a, b) => b[1].at - a[1].at)
+        .slice(0, OMDB_CACHE_MAX);
+      localStorage.setItem(OMDB_CACHE_STORAGE, JSON.stringify(Object.fromEntries(entries)));
+    } catch (e) {
+      // Sin espacio o modo privado: la caché se queda solo en memoria
+    }
+  },
+
+  // Clave de caché: el id de IMDb si se conoce y, si no, título + año + tipo
+  omdbCacheKey(item) {
+    if (!item) return null;
+    if (item.imdbId) return item.imdbId;
+    const title = (item.title || '').trim().toLowerCase();
+    if (!title) return null;
+    const year = item.year && item.year !== 'N/A' ? item.year : '';
+    return `${item.type === 'series' ? 'series' : 'movie'}:${title}:${year}`;
+  },
+
+  // Nota ya cacheada, sin tocar la red. Devuelve null si no hay nada guardado.
+  getCachedRatings(item) {
+    const key = this.omdbCacheKey(item);
+    if (!key) return null;
+    const entry = this._loadOmdbCache().get(key);
+    return entry ? entry.data : null;
+  },
+
+  /**
+   * Notas de IMDb y Metacritic de una película o serie.
+   * Devuelve { imdb, imdbVotes, metascore, imdbId } o null si OMDb no la
+   * conoce o no hay clave guardada. Los fallos no se propagan: la nota es un
+   * adorno, no puede romper una búsqueda.
+   */
+  async getRatings(item) {
+    const cacheKey = this.omdbCacheKey(item);
+    if (!cacheKey || !this.hasOmdbKey()) return null;
+
+    const cache = this._loadOmdbCache();
+    if (cache.has(cacheKey)) return cache.get(cacheKey).data;
+
+    // Dos tarjetas del mismo título no deben lanzar dos peticiones
+    if (this._omdbPending.has(cacheKey)) return this._omdbPending.get(cacheKey);
+
+    const request = this._fetchOmdb(item)
+      .catch(error => {
+        console.warn('OMDb no respondió, se muestra sin nota:', error.message || error);
+        return null;
+      })
+      .then(data => {
+        // Se cachea también el "no encontrado" para no reintentarlo cada vez
+        cache.set(cacheKey, { at: Date.now(), data });
+        this._saveOmdbCache();
+        this._omdbPending.delete(cacheKey);
+        return data;
+      });
+
+    this._omdbPending.set(cacheKey, request);
+    return request;
+  },
+
+  async _fetchOmdb(item) {
+    const params = new URLSearchParams({ apikey: this.getOmdbKey(), r: 'json' });
+
+    if (item.imdbId) {
+      // Búsqueda exacta por id: es la fiable
+      params.set('i', item.imdbId);
+    } else {
+      // Sin id hay que ir por título; el año evita confundir remakes
+      params.set('t', item.title || '');
+      params.set('type', item.type === 'series' ? 'series' : 'movie');
+      if (item.year && /^\d{4}$/.test(String(item.year))) params.set('y', String(item.year));
+    }
+
+    const data = await this.fetchJson(`${this.OMDB_BASE}?${params.toString()}`, { timeout: 7000, retries: 0 });
+    if (!data || data.Response === 'False') return null;
+
+    const imdb = this._omdbNumber(data.imdbRating);
+    const metascore = this._omdbNumber(data.Metascore);
+    if (imdb === null && metascore === null) return null;
+
+    return {
+      imdb,
+      imdbVotes: data.imdbVotes && data.imdbVotes !== 'N/A' ? data.imdbVotes : null,
+      metascore,
+      imdbId: data.imdbID && data.imdbID !== 'N/A' ? data.imdbID : (item.imdbId || null)
+    };
+  },
+
+  // OMDb devuelve la cadena "N/A" cuando no tiene nota, no un nulo
+  _omdbNumber(value) {
+    if (!value || value === 'N/A') return null;
+    const number = Number(value);
+    return Number.isFinite(number) ? number : null;
+  },
+
+  /**
+   * Notas de varios títulos a la vez. Solo los `limit` primeros llegan a pedir
+   * datos a OMDb; del resto se devuelve lo que hubiera en caché, para no
+   * agotar la cuota diaria con una lista larga de resultados.
+   */
+  async getRatingsBatch(items, limit = 10) {
+    return Promise.all(
+      (items || []).map((item, index) =>
+        index < limit
+          ? this.getRatings(item).catch(() => null)
+          : Promise.resolve(this.getCachedRatings(item))
+      )
+    );
   },
 
   // ───────────────────────────── TVMaze ─────────────────────────────
@@ -382,6 +570,8 @@ const API_SERVICE = {
           status: show.status || 'Unknown',
           summary: this.stripHtml(show.summary),
           rating: rating,
+          // TVMaze publica los ids externos de cada serie
+          imdbId: show.externals?.imdb || null,
           duration: epDuration ? `${epDuration} min/ep` : null,
           episodeDuration: epDuration || 45,
           network: show.network?.name || show.webChannel?.name || 'TV/Streaming',

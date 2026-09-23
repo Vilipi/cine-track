@@ -17,15 +17,28 @@ La clave se almacena **solo en tu navegador** (`localStorage`). No está escrita
 
 ---
 
+## ⭐ Opcional: notas de IMDb y Metacritic
+
+Las puntuaciones de **IMDb** y el **Metascore** de **Metacritic** se piden a [OMDb](https://www.omdbapi.com), la única API pública que publica las dos. También pide una clave gratuita, pero es **opcional**: sin ella la app funciona igual, solo que sin esas notas.
+
+1. Pide la clave en [omdbapi.com/apikey.aspx](https://www.omdbapi.com/apikey.aspx), opción **FREE** (1.000 consultas al día).
+2. Te llega por correo: pulsa el enlace de activación, o la clave no funcionará.
+3. En CineTrack, abre el menú ⚙️ → **Notas de IMDb y Metacritic**, pégala y guarda.
+
+Se guarda igual que la de TMDB: solo en ese navegador. Las notas se muestran en los resultados de búsqueda, en la ficha de vista previa y en las tarjetas de tu biblioteca, y quedan guardadas junto al título. Para no gastar la cuota diaria, las respuestas se **cachean una semana** en el navegador, solo los 10 primeros resultados de cada búsqueda consultan OMDb, y los títulos que ya tenías guardados se van completando poco a poco según navegas.
+
+---
+
 ## ✨ Qué hace
 
 - **Buscador con datos reales**: series desde TVMaze y películas desde TMDB, en español, con carátulas, sinopsis, duración, director, géneros y valoración.
+- **Notas de IMDb y Metacritic** (opcional, vía OMDb): se ven en el buscador, en la vista previa y en tu biblioteca, con el Metascore coloreado como en Metacritic.
 - **Seguimiento de series por episodios**: lista real de temporadas y capítulos, marcado individual, por temporada o serie completa, y barra de progreso.
 - **Estados**: *Viendo*, *Por ver*, *Completadas*, *En pausa* y *Favoritas*.
 - **Valoración personal** de 0 a 10, plataforma de streaming y notas.
 - **Filtros** por tipo, estado, género y búsqueda de texto sobre tu propia lista.
 - **Copias de seguridad**: exportar e importar toda la biblioteca en un archivo JSON.
-- **Datos de ejemplo** al abrirla por primera vez (Breaking Bad, Stranger Things, Interstellar y Dune: Parte 2), que puedes borrar con ⚙️ → *Restablecer*, que deja la lista vacía (antes conviene descargar una copia). Restablecer no toca el idioma ni la clave de TMDB.
+- **Empieza vacía**: la primera vez que la abres no hay ningún título de ejemplo, la lista es tuya desde el principio. Para vaciarla en cualquier momento, ⚙️ → *Restablecer* (antes conviene descargar una copia). Restablecer no toca el idioma ni las claves de TMDB y OMDb.
 - **Tres idiomas**: español, inglés y polaco. Se elige desde ⚙️ → *Idioma* (con banderas) y se recuerda en cada dispositivo. También cambia el idioma en que TMDB devuelve títulos y sinopsis.
 - **Diseño adaptado a móvil**, con modales a pantalla completa y áreas táctiles cómodas.
 
@@ -73,8 +86,8 @@ Los textos del HTML llevan `data-i18n="clave"`; los que genera `app.js` usan `t(
 | `styles.css` | Estilos propios, rejilla de pósters y ajustes de móvil |
 | `i18n.js` | Traducciones (es / en / pl), plurales y cambio de idioma |
 | `genres.js` | Tabla de géneros conocidos y sus nombres en los tres idiomas |
-| `api.js` | Integración con TMDB y TVMaze, y gestión de la clave |
-| `storage.js` | Persistencia en `localStorage`, datos de ejemplo y copias de seguridad |
+| `api.js` | Integración con TMDB, TVMaze y OMDb, y gestión de las claves |
+| `storage.js` | Persistencia en `localStorage` y copias de seguridad |
 | `app.js` | Lógica de interfaz: renderizado, filtros, modales y eventos |
 
 Los estilos base vienen de **Tailwind** y la tipografía **Outfit** de Google Fonts, ambos

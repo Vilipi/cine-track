@@ -47,6 +47,9 @@
   add('menu.apiKey', 'Clave de TMDB', 'TMDB key', 'Klucz TMDB');
   add('menu.apiKeyNeeded', 'Necesaria para buscar películas', 'Required to search movies', 'Wymagany do wyszukiwania filmów');
   add('menu.apiKeySaved', 'Guardada en este dispositivo', 'Saved on this device', 'Zapisany na tym urządzeniu');
+  add('menu.omdbKey', 'Notas de IMDb y Metacritic', 'IMDb & Metacritic scores', 'Oceny IMDb i Metacritic');
+  add('menu.omdbKeyNeeded', 'Opcional: clave gratuita de OMDb', 'Optional: free OMDb key', 'Opcjonalnie: darmowy klucz OMDb');
+  add('menu.omdbKeySaved', 'Activadas en este dispositivo', 'Enabled on this device', 'Włączone na tym urządzeniu');
   add('menu.reset', 'Restablecer', 'Reset', 'Resetuj');
   add('menu.resetSub', 'Vaciar la lista y empezar de cero', 'Clear the list and start fresh', 'Wyczyść listę i zacznij od nowa');
 
@@ -122,7 +125,9 @@
   add('movies.subDefault', 'Largometrajes con duración real y calificaciones', 'Feature films with real runtimes and ratings', 'Filmy pełnometrażowe z rzeczywistym czasem trwania i ocenami');
   add('series.subDefault', 'Seguimiento por temporadas y episodios', 'Tracking by seasons and episodes', 'Śledzenie według sezonów i odcinków');
 
-  add('empty.movies.title', 'No hay películas en esta vista', 'There are no movies in this view', 'W tym widoku nie ma filmów');
+  add('empty.welcome.title', 'Tu lista está vacía', 'Your list is empty', 'Twoja lista jest pusta');
+  add('empty.welcome.desc', 'Busca una serie o película y añádela para empezar a llevar su seguimiento.', 'Search for a series or movie and add it to start tracking.', 'Wyszukaj serial lub film i dodaj go, aby zacząć śledzenie.');
+  add('empty.movies.title','No hay películas en esta vista', 'There are no movies in this view', 'W tym widoku nie ma filmów');
   add('empty.movies.desc', 'Prueba con otro estado o busca películas en la API para agregarlas.', 'Try another status or search for movies online to add them.', 'Spróbuj innego statusu lub wyszukaj filmy online, aby je dodać.');
   add('empty.series.title', 'No hay series en esta vista', 'There are no series in this view', 'W tym widoku nie ma seriali');
   add('empty.series.desc', 'Prueba con otro estado o busca series en la API para llevar su seguimiento.', 'Try another status or search for series online to start tracking them.', 'Spróbuj innego statusu lub wyszukaj seriale online, aby zacząć je śledzić.');
@@ -266,6 +271,23 @@
   add('apiKey.statusNone', 'Sin clave guardada', 'No key saved', 'Brak zapisanego klucza');
   add('apiKey.statusSaved', 'Clave guardada (termina en …{last})', 'Key saved (ends in …{last})', 'Klucz zapisany (kończy się na …{last})');
   add('apiKey.delete', 'Borrar clave', 'Delete key', 'Usuń klucz');
+
+  // ───────────────────────────── Clave de OMDb (IMDb / Metacritic) ─────────────────────────────
+  add('omdbKey.intro',
+    'Las notas de <span class="text-slate-200 font-semibold">IMDb</span> y <span class="text-slate-200 font-semibold">Metacritic</span> se piden a <span class="text-slate-200 font-semibold">OMDb</span>, que necesita una clave gratuita. Es <span class="text-slate-200 font-semibold">opcional</span>: sin ella la app funciona igual, solo que sin esas puntuaciones. Se guarda <span class="text-slate-200 font-semibold">solo en este dispositivo</span>.',
+    '<span class="text-slate-200 font-semibold">IMDb</span> and <span class="text-slate-200 font-semibold">Metacritic</span> scores come from <span class="text-slate-200 font-semibold">OMDb</span>, which needs a free key. It is <span class="text-slate-200 font-semibold">optional</span>: without it the app works the same, just without those scores. It is stored <span class="text-slate-200 font-semibold">only on this device</span>.',
+    'Oceny <span class="text-slate-200 font-semibold">IMDb</span> i <span class="text-slate-200 font-semibold">Metacritic</span> pochodzą z <span class="text-slate-200 font-semibold">OMDb</span>, które wymaga darmowego klucza. Jest <span class="text-slate-200 font-semibold">opcjonalny</span>: bez niego aplikacja działa tak samo, tylko bez tych ocen. Jest zapisywany <span class="text-slate-200 font-semibold">tylko na tym urządzeniu</span>.');
+  add('omdbKey.label', 'Clave de OMDb', 'OMDb key', 'Klucz OMDb');
+  add('omdbKey.hint', 'La consigues gratis en omdbapi.com → API Key → FREE. Llega por correo y hay que pulsar el enlace de activación.', 'Get it free at omdbapi.com → API Key → FREE. It arrives by email and you must click the activation link.', 'Zdobądź go za darmo na omdbapi.com → API Key → FREE. Przychodzi e-mailem i trzeba kliknąć link aktywacyjny.');
+  add('omdbKey.placeholder', '8 caracteres, por ejemplo 1a2b3c4d', '8 characters, e.g. 1a2b3c4d', '8 znaków, np. 1a2b3c4d');
+
+  add('ratings.imdbTitle', 'Nota de IMDb: {v}/10', 'IMDb score: {v}/10', 'Ocena IMDb: {v}/10');
+  add('ratings.imdbTitleVotes', 'Nota de IMDb: {v}/10 ({n} votos)', 'IMDb score: {v}/10 ({n} votes)', 'Ocena IMDb: {v}/10 ({n} głosów)');
+  add('ratings.metaTitle', 'Metascore de Metacritic: {v}/100', 'Metacritic Metascore: {v}/100', 'Metascore w Metacritic: {v}/100');
+
+  add('toast.omdbKeyInvalid', 'Esa no parece una clave de OMDb: son 8 caracteres', 'That does not look like an OMDb key: it is 8 characters', 'To nie wygląda na klucz OMDb: ma 8 znaków');
+  add('toast.omdbKeySaved', 'Clave guardada. Ya se ven las notas de IMDb y Metacritic', 'Key saved. IMDb and Metacritic scores are now shown', 'Klucz zapisany. Oceny IMDb i Metacritic są już widoczne');
+  add('toast.omdbKeyDeleted', 'Clave de OMDb borrada. Se dejan de mostrar las notas', 'OMDb key deleted. Scores will no longer be shown', 'Klucz OMDb usunięty. Oceny nie będą już wyświetlane');
 
   // ───────────────────────────── Avisos, confirmaciones y mensajes ─────────────────────────────
   add('toast.default', 'Operación realizada con éxito', 'Operation completed successfully', 'Operacja zakończona pomyślnie');

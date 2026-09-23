@@ -122,6 +122,19 @@ document.addEventListener('DOMContentLoaded', () => {
     apiKeyStatusDot: document.getElementById('apiKeyStatusDot'),
     deleteApiKeyBtn: document.getElementById('deleteApiKeyBtn'),
 
+    // Clave de OMDb (notas de IMDb y Metacritic)
+    omdbKeyBtn: document.getElementById('omdbKeyBtn'),
+    omdbKeyMenuState: document.getElementById('omdbKeyMenuState'),
+    omdbKeyModal: document.getElementById('omdbKeyModal'),
+    closeOmdbKeyModalBtn: document.getElementById('closeOmdbKeyModalBtn'),
+    omdbKeyForm: document.getElementById('omdbKeyForm'),
+    omdbKeyInput: document.getElementById('omdbKeyInput'),
+    omdbKeyStatus: document.getElementById('omdbKeyStatus'),
+    omdbKeyStatusDot: document.getElementById('omdbKeyStatusDot'),
+    deleteOmdbKeyBtn: document.getElementById('deleteOmdbKeyBtn'),
+    previewRatings: document.getElementById('previewRatings'),
+    editRatings: document.getElementById('editRatings'),
+
     // Toast
     toast: document.getElementById('toast'),
     toastMessage: document.getElementById('toastMessage')
@@ -180,7 +193,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function closeAllModals() {
-    [DOM.searchModal, DOM.editModal, DOM.previewModal, DOM.manualModal, DOM.apiKeyModal].forEach(m => {
+    [DOM.searchModal, DOM.editModal, DOM.previewModal, DOM.manualModal, DOM.apiKeyModal, DOM.omdbKeyModal].forEach(m => {
       if (m) m.classList.add('hidden');
     });
     if (typeof closeOptionsMenu === 'function') closeOptionsMenu();
@@ -314,7 +327,12 @@ document.addEventListener('DOMContentLoaded', () => {
       if (DOM.catalogDivider) DOM.catalogDivider.classList.add('hidden');
       if (DOM.emptyState) DOM.emptyState.classList.remove('hidden');
 
-      if (state.typeFilter === 'movie') {
+      // Con la biblioteca aún vacía no ha habido ninguna búsqueda fallida:
+      // se da la bienvenida en vez de decir "no se encontraron resultados".
+      if (allItems.length === 0) {
+        if (DOM.emptyStateTitle) DOM.emptyStateTitle.textContent = t('empty.welcome.title');
+        if (DOM.emptyStateDesc) DOM.emptyStateDesc.textContent = t('empty.welcome.desc');
+      } else if (state.typeFilter === 'movie') {
         if (DOM.emptyStateTitle) DOM.emptyStateTitle.textContent = t('empty.movies.title');
         if (DOM.emptyStateDesc) DOM.emptyStateDesc.textContent = t('empty.movies.desc');
       } else if (state.typeFilter === 'series') {
@@ -432,6 +450,48 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
       DOM.moviesSection.classList.add('hidden');
     }
+
+    fillMissingRatings(filteredItems).catch(() => {});
+  }
+
+  // Tope de notas que se rellenan por tanda y por sesión. Los títulos que ya
+  // estaban en la lista antes de configurar OMDb (o los importados de una
+  // copia) se van completando poco a poco, sin vaciar la cuota diaria de golpe.
+  const LIBRARY_RATINGS_BATCH = 6;
+  const LIBRARY_RATINGS_SESSION_MAX = 60;
+  const ratingsAttempted = new Set();
+
+  /**
+   * Busca las notas que falten en los títulos ya guardados y las persiste.
+   * Cada ítem se intenta una sola vez por sesión: si OMDb no lo conoce, no se
+   * vuelve a preguntar hasta recargar la app.
+   */
+  async function fillMissingRatings(items) {
+    if (!API_SERVICE.hasOmdbKey() || navigator.onLine === false) return;
+    if (ratingsAttempted.size >= LIBRARY_RATINGS_SESSION_MAX) return;
+
+    const pending = (items || [])
+      .filter(item => !item.ratings && !ratingsAttempted.has(item.id))
+      .slice(0, LIBRARY_RATINGS_BATCH);
+    if (pending.length === 0) return;
+
+    pending.forEach(item => ratingsAttempted.add(item.id));
+
+    const results = await Promise.all(
+      pending.map(item => API_SERVICE.getRatings(item).catch(() => null))
+    );
+
+    let saved = 0;
+    results.forEach((data, index) => {
+      if (!data) return;
+      // Se guarda también el id de IMDb: la próxima consulta será exacta
+      if (STORAGE_SERVICE.updateItem(pending[index].id, { ratings: data, imdbId: data.imdbId || pending[index].imdbId || null })) {
+        saved++;
+      }
+    });
+
+    // Repintar arrastra la siguiente tanda: la lista se completa sola
+    if (saved > 0) renderLibrary();
   }
 
   // ==========================================
@@ -617,6 +677,9 @@ document.addEventListener('DOMContentLoaded', () => {
       </span>
     ` : '';
 
+    // Notas de IMDb y Metacritic guardadas al añadir el título
+    const externalRatingsHtml = ratingsBadgesHtml(item.ratings);
+
     const safeTitle = (item.title || t('card.titleFallback')).replace(/"/g, '&quot;');
     const posterSrc = item.poster || API_SERVICE.getPlaceholderPoster(item.title, item.type);
 
@@ -668,6 +731,8 @@ document.addEventListener('DOMContentLoaded', () => {
             <span>${item.year || ''}</span>
             ${item.duration ? `<span class="text-slate-600">&bull;</span><span>${item.duration}</span>` : ''}
           </div>
+
+          ${externalRatingsHtml ? `<div class="flex flex-wrap items-center gap-1.5 mt-1.5">${externalRatingsHtml}</div>` : ''}
 
           ${item.genres && item.genres.length ? `
             <div class="flex items-center gap-1 flex-wrap mt-2">
@@ -809,6 +874,127 @@ document.addEventListener('DOMContentLoaded', () => {
   function closeApiKeyModal() {
     if (DOM.apiKeyModal) DOM.apiKeyModal.classList.add('hidden');
     popModalState();
+  }
+
+  // ==========================================
+  // CLAVE DE OMDb (notas de IMDb y Metacritic)
+  // ==========================================
+  function refreshOmdbKeyUI() {
+    const key = API_SERVICE.getOmdbKey();
+    const hasKey = key.length > 0;
+
+    if (DOM.omdbKeyMenuState) {
+      DOM.omdbKeyMenuState.textContent = hasKey
+        ? t('menu.omdbKeySaved')
+        : t('menu.omdbKeyNeeded');
+      DOM.omdbKeyMenuState.className = hasKey
+        ? 'text-[10px] text-emerald-400/90 block'
+        : 'text-[10px] text-slate-400 block';
+    }
+
+    if (DOM.omdbKeyStatus) {
+      DOM.omdbKeyStatus.textContent = hasKey
+        ? t('apiKey.statusSaved', { last: key.slice(-4) })
+        : t('apiKey.statusNone');
+      DOM.omdbKeyStatus.className = hasKey
+        ? 'text-[11px] font-semibold text-emerald-300'
+        : 'text-[11px] font-semibold text-slate-400';
+    }
+
+    if (DOM.omdbKeyStatusDot) {
+      DOM.omdbKeyStatusDot.className = hasKey
+        ? 'w-2 h-2 rounded-full bg-emerald-400 shrink-0'
+        : 'w-2 h-2 rounded-full bg-slate-600 shrink-0';
+    }
+  }
+
+  function openOmdbKeyModal() {
+    if (!DOM.omdbKeyModal) return;
+    if (typeof closeOptionsMenu === 'function') closeOptionsMenu();
+    DOM.omdbKeyInput.value = API_SERVICE.getOmdbKey();
+    refreshOmdbKeyUI();
+    DOM.omdbKeyModal.classList.remove('hidden');
+    pushModalState();
+    setTimeout(() => DOM.omdbKeyInput.focus(), 100);
+  }
+
+  function closeOmdbKeyModal() {
+    if (DOM.omdbKeyModal) DOM.omdbKeyModal.classList.add('hidden');
+    popModalState();
+  }
+
+  // ==========================================
+  // INSIGNIAS DE NOTAS EXTERNAS (IMDb / METACRITIC)
+  // ==========================================
+
+  // Metacritic colorea su nota: verde a partir de 61, amarilla entre 40 y 60 y
+  // roja por debajo. Se respeta ese código, que la gente ya reconoce.
+  function metascoreClass(score) {
+    if (score >= 61) return 'bg-emerald-500 text-slate-950';
+    if (score >= 40) return 'bg-amber-400 text-slate-950';
+    return 'bg-rose-500 text-white';
+  }
+
+  /**
+   * Insignias de IMDb y Metacritic. Devuelve cadena vacía si no hay ninguna
+   * nota, para poder decidir fuera si la fila se pinta o no.
+   */
+  function ratingsBadgesHtml(ratings, size = 'sm') {
+    if (!ratings) return '';
+    const textSize = size === 'md' ? 'text-[11px]' : 'text-[10px]';
+    const parts = [];
+
+    if (ratings.imdb != null) {
+      const value = ratings.imdb.toFixed(1);
+      const title = ratings.imdbVotes
+        ? t('ratings.imdbTitleVotes', { v: value, n: ratings.imdbVotes })
+        : t('ratings.imdbTitle', { v: value });
+      parts.push(`
+        <span class="inline-flex items-center gap-1 ${textSize} font-bold px-1.5 py-0.5 rounded bg-[#f5c518] text-slate-950" title="${title}">
+          <span class="font-black tracking-tighter">IMDb</span>
+          <span>${value}</span>
+        </span>
+      `);
+    }
+
+    if (ratings.metascore != null) {
+      parts.push(`
+        <span class="inline-flex items-center gap-1 ${textSize} font-semibold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700" title="${t('ratings.metaTitle', { v: ratings.metascore })}">
+          <span class="inline-flex items-center justify-center w-4 h-4 rounded-sm font-black text-[9px] ${metascoreClass(ratings.metascore)}">${ratings.metascore}</span>
+          <span>Metacritic</span>
+        </span>
+      `);
+    }
+
+    return parts.join('');
+  }
+
+  // Pinta (o esconde, si no hay notas) la fila de insignias de un contenedor
+  function renderRatingsInto(el, ratings) {
+    if (!el) return;
+    const html = ratingsBadgesHtml(ratings, 'md');
+    el.innerHTML = html;
+    el.classList.toggle('hidden', !html);
+  }
+
+  function renderPreviewRatings(ratings) {
+    renderRatingsInto(DOM.previewRatings, ratings);
+  }
+
+  /**
+   * Notas en la ficha de un título ya guardado. Si todavía no las tiene
+   * (se añadió antes de configurar OMDb), se piden y se guardan al vuelo.
+   */
+  function renderEditRatings(item) {
+    renderRatingsInto(DOM.editRatings, item.ratings);
+    if (item.ratings) return;
+
+    API_SERVICE.getRatings(item).then(data => {
+      if (!data || state.activeModalItem !== item) return;
+      item.ratings = data;
+      STORAGE_SERVICE.updateItem(item.id, { ratings: data, imdbId: data.imdbId || item.imdbId || null });
+      renderRatingsInto(DOM.editRatings, data);
+    }).catch(() => {});
   }
 
   // ==========================================
@@ -1089,6 +1275,7 @@ document.addEventListener('DOMContentLoaded', () => {
               ${item.duration ? `<span class="text-xs text-slate-400 font-medium">  ${item.duration}</span>` : ''}
             </div>
             <h4 class="font-bold text-white text-sm line-clamp-1 mt-1">${item.title}</h4>
+            <div data-ratings-slot="${index}" class="${item.ratings ? 'flex flex-wrap items-center gap-1.5 mt-1' : ''}">${ratingsBadgesHtml(item.ratings)}</div>
             <p class="text-xs text-slate-400 line-clamp-2 mt-1">${getSummary(item)}</p>
             ${item.matchedPerson ? `
               <p class="text-[11px] text-amber-300/90 mt-1 flex items-center gap-1">
@@ -1124,9 +1311,43 @@ document.addEventListener('DOMContentLoaded', () => {
         DOM.apiSearchResults.appendChild(resultCard);
       });
 
+      // Sin await: las notas son un extra que llega después, no debe
+      // retrasar la aparición de los resultados
+      hydrateSearchRatings(results).catch(() => {});
+
     } catch (err) {
       DOM.apiSearchLoading.classList.add('hidden');
       showToast(t('search.error'), 'error');
+    }
+  }
+
+  // Cuántos resultados llegan a consultar OMDb en cada búsqueda. El resto solo
+  // muestra nota si ya estaba en caché: el plan gratuito son 1.000 al día.
+  const SEARCH_RATINGS_LIMIT = 10;
+
+  /**
+   * Las notas externas se piden después de pintar los resultados: la lista
+   * aparece al instante y las insignias caen encima cuando OMDb responde.
+   */
+  async function hydrateSearchRatings(results) {
+    if (!API_SERVICE.hasOmdbKey() || navigator.onLine === false) return;
+
+    const ratings = await API_SERVICE.getRatingsBatch(results, SEARCH_RATINGS_LIMIT);
+
+    ratings.forEach((data, index) => {
+      // Entre la petición y la respuesta puede haber otra búsqueda en pantalla
+      if (!data || state.apiSearchResults[index] !== results[index]) return;
+      results[index].ratings = data;
+
+      const slot = DOM.apiSearchResults.querySelector(`[data-ratings-slot="${index}"]`);
+      if (!slot) return;
+      slot.className = 'flex flex-wrap items-center gap-1.5 mt-1';
+      slot.innerHTML = ratingsBadgesHtml(data);
+    });
+
+    // La ficha de vista previa puede estar abierta sobre estos resultados
+    if (state.activePreviewItem && state.activePreviewItem.ratings) {
+      renderPreviewRatings(state.activePreviewItem.ratings);
     }
   }
 
@@ -1533,6 +1754,7 @@ document.addEventListener('DOMContentLoaded', () => {
       durationEl.textContent = item.duration ? `• ${item.duration}` : '';
     }
     document.getElementById('editSummary').textContent = getSummary(item);
+    renderEditRatings(item);
 
     const castRow = document.getElementById('editCastRow');
     const hasCastInfo = item.type === 'movie' && (
@@ -1629,6 +1851,17 @@ document.addEventListener('DOMContentLoaded', () => {
       DOM.previewCastLine.textContent = item.cast ? `Reparto: ${item.cast}` : '';
     } else {
       DOM.previewCastRow.classList.add('hidden');
+    }
+
+    // Si la nota ya vino con los resultados se pinta al instante; si no, se
+    // pide a OMDb y se añade cuando llegue, sin retrasar la apertura.
+    renderPreviewRatings(item.ratings);
+    if (!item.ratings) {
+      API_SERVICE.getRatings(item).then(data => {
+        if (!data || state.activePreviewItem !== item) return;
+        item.ratings = data;
+        renderPreviewRatings(data);
+      }).catch(() => {});
     }
 
     updatePreviewAddBtn();
@@ -2083,6 +2316,56 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // ── Clave de OMDb (notas de IMDb y Metacritic) ─────────────────
+  if (DOM.omdbKeyBtn) DOM.omdbKeyBtn.addEventListener('click', openOmdbKeyModal);
+  if (DOM.closeOmdbKeyModalBtn) DOM.closeOmdbKeyModalBtn.addEventListener('click', closeOmdbKeyModal);
+
+  if (DOM.omdbKeyForm) {
+    DOM.omdbKeyForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const value = DOM.omdbKeyInput.value.trim();
+
+      if (!value) {
+        showToast(t('toast.keyNeeded'), 'error');
+        return;
+      }
+      // Las claves de OMDb son 8 caracteres alfanuméricos
+      if (!/^[a-z0-9]{8}$/i.test(value)) {
+        showToast(t('toast.omdbKeyInvalid'), 'error');
+        return;
+      }
+      if (!API_SERVICE.setOmdbKey(value)) {
+        showToast(t('toast.keySaveFail'), 'error');
+        return;
+      }
+
+      refreshOmdbKeyUI();
+      closeOmdbKeyModal();
+      showToast(t('toast.omdbKeySaved'));
+
+      // Con la clave recién puesta ya se pueden rellenar las notas que faltan
+      ratingsAttempted.clear();
+      renderLibrary();
+
+      if (DOM.searchModal && !DOM.searchModal.classList.contains('hidden') && DOM.apiSearchInput.value.trim()) {
+        handleApiSearch();
+      }
+    });
+  }
+
+  if (DOM.deleteOmdbKeyBtn) {
+    DOM.deleteOmdbKeyBtn.addEventListener('click', () => {
+      if (!API_SERVICE.getOmdbKey()) {
+        showToast(t('toast.keyNone'), 'error');
+        return;
+      }
+      API_SERVICE.setOmdbKey('');
+      DOM.omdbKeyInput.value = '';
+      refreshOmdbKeyUI();
+      showToast(t('toast.omdbKeyDeleted'));
+    });
+  }
+
   // Botón "Añadir" del aviso que sale dentro del buscador
   if (DOM.apiSearchResults) {
     DOM.apiSearchResults.addEventListener('click', (e) => {
@@ -2091,7 +2374,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Cerrar modales haciendo clic en el backdrop oscuro
-  [DOM.searchModal, DOM.editModal, DOM.previewModal, DOM.manualModal, DOM.apiKeyModal].forEach(modal => {
+  [DOM.searchModal, DOM.editModal, DOM.previewModal, DOM.manualModal, DOM.apiKeyModal, DOM.omdbKeyModal].forEach(modal => {
     if (!modal) return;
     modal.addEventListener('click', (e) => {
       if (e.target === modal) {
@@ -2135,6 +2418,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.addEventListener('cinetrack:languagechange', () => {
     renderLibrary();
     refreshApiKeyUI();
+    refreshOmdbKeyUI();
     syncSearchResultButtons();
     updatePreviewAddBtn();
   });
@@ -2144,6 +2428,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // ==========================================
   renderLibrary();
   refreshApiKeyUI();
+  refreshOmdbKeyUI();
 
   // Comprobar si hay un parámetro de compartir (?search=)
   const urlParams = new URLSearchParams(window.location.search);

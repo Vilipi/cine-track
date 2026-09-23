@@ -5,94 +5,6 @@
 
 const STORAGE_KEY = 'cinetrack_user_library_v1';
 
-// Datos de demostración iniciales con portadas HD para dar la bienvenida al usuario
-const INITIAL_DEMO_ITEMS = [
-  {
-    id: 'demo-1',
-    originalId: 169,
-    apiId: 'tvmaze_169',
-    title: 'Breaking Bad',
-    type: 'series',
-    status: 'completed',
-    favorite: true,
-    poster: 'https://static.tvmaze.com/uploads/images/original_untouched/501/1253519.jpg',
-    backdrop: 'https://static.tvmaze.com/uploads/images/original_untouched/501/1253519.jpg',
-    year: '2008',
-    genres: ['Drama', 'Crime', 'Thriller'],
-    userRating: 10,
-    platform: 'Netflix',
-    notes: 'Una de las mejores series de la historia. El desarrollo de Walter White es sublime.',
-    currentSeason: 5,
-    currentEpisode: 62,
-    totalEpisodes: 62,
-    totalSeasons: 5,
-    duration: '60 min/ep',
-    episodeDuration: 60,
-    summary: 'Un profesor de química con cáncer terminal se asocia con un antiguo alumno para fabricar metanfetamina y asegurar el futuro económico de su familia.',
-    createdAt: Date.now() - 86400000 * 10
-  },
-  {
-    id: 'demo-2',
-    title: 'Interstellar',
-    type: 'movie',
-    status: 'completed',
-    favorite: true,
-    poster: 'https://is1-ssl.mzstatic.com/image/thumb/Video5/v4/94/0b/4e/940b4e58-6628-dfb4-2565-5521c11dcdd4/pr_source.lsr/600x600bb.jpg',
-    backdrop: 'https://is1-ssl.mzstatic.com/image/thumb/Video5/v4/94/0b/4e/940b4e58-6628-dfb4-2565-5521c11dcdd4/pr_source.lsr/600x600bb.jpg',
-    year: '2014',
-    genres: ['Ciencia Ficción', 'Aventura', 'Drama'],
-    userRating: 10,
-    platform: 'Max',
-    notes: 'Banda sonora increíble de Hans Zimmer. Obra maestra de Christopher Nolan.',
-    durationMinutes: 169,
-    duration: '169 min',
-    summary: 'Un grupo de exploradores viaja a través de un agujero de gusano en el espacio en un intento por asegurar la supervivencia de la humanidad.',
-    createdAt: Date.now() - 86400000 * 5
-  },
-  {
-    id: 'demo-3',
-    originalId: 2993,
-    apiId: 'tvmaze_2993',
-    title: 'Stranger Things',
-    type: 'series',
-    status: 'watching',
-    favorite: false,
-    poster: 'https://static.tvmaze.com/uploads/images/original_untouched/470/1177062.jpg',
-    backdrop: 'https://static.tvmaze.com/uploads/images/original_untouched/470/1177062.jpg',
-    year: '2016',
-    genres: ['Drama', 'Fantasy', 'Horror', 'Mystery'],
-    userRating: 9,
-    platform: 'Netflix',
-    notes: 'Esperando con ganas la última temporada.',
-    currentSeason: 4,
-    currentEpisode: 34,
-    totalEpisodes: 42,
-    totalSeasons: 5,
-    duration: '65 min/ep',
-    episodeDuration: 65,
-    summary: 'Cuando un niño desaparece en Hawkins, una pequeña localidad, sus amigos, la familia y la policía se ven envueltos en una conspiración secreta del gobierno.',
-    createdAt: Date.now() - 86400000 * 2
-  },
-  {
-    id: 'demo-4',
-    title: 'Dune: Parte 2',
-    type: 'movie',
-    status: 'plan_to_watch',
-    favorite: false,
-    poster: 'https://is1-ssl.mzstatic.com/image/thumb/Video221/v4/71/a8/31/71a8312e-a20a-29b2-af70-5cab08908657/aca7621e-74e7-419a-96cd-5aaff99fb0cc_DUNE_PART2_V_DD_KA_TT_2000x3000_300dpi_EN-srgb.lsr/600x600bb.jpg',
-    backdrop: 'https://is1-ssl.mzstatic.com/image/thumb/Video221/v4/71/a8/31/71a8312e-a20a-29b2-af70-5cab08908657/aca7621e-74e7-419a-96cd-5aaff99fb0cc_DUNE_PART2_V_DD_KA_TT_2000x3000_300dpi_EN-srgb.lsr/600x600bb.jpg',
-    year: '2024',
-    genres: ['Ciencia Ficción', 'Acción'],
-    userRating: 0,
-    platform: 'Max',
-    notes: 'Pendiente para ver este fin de semana.',
-    durationMinutes: 166,
-    duration: '166 min',
-    summary: 'Paul Atreides se une a Chani y a los Fremen mientras busca venganza contra los conspiradores que destruyeron a su familia.',
-    createdAt: Date.now() - 86400000 * 1
-  }
-];
-
 const STORAGE_SERVICE = {
   /**
    * Obtiene todos los títulos guardados
@@ -101,64 +13,22 @@ const STORAGE_SERVICE = {
     try {
       const data = localStorage.getItem(STORAGE_KEY);
       if (!data) {
-        // Primera ejecución: inicializar con demos
-        this.saveItems(INITIAL_DEMO_ITEMS);
-        return INITIAL_DEMO_ITEMS;
+        // Primera ejecución: la lista empieza vacía. Se guarda "[]" para que
+        // la próxima lectura no la confunda con una instalación nueva.
+        this.saveItems([]);
+        return [];
       }
       let items = JSON.parse(data);
       if (!Array.isArray(items)) return [];
 
-      // Auto-reparar imágenes rotas, IDs y duraciones de las demos previas en localStorage
       let updated = false;
       items = items.map(item => {
-        if (item.id === 'demo-1') {
-          if (!item.originalId) { item.originalId = 169; updated = true; }
-          if (!item.apiId) { item.apiId = 'tvmaze_169'; updated = true; }
-          if (!item.duration) {
-            item.duration = INITIAL_DEMO_ITEMS[0].duration;
-            item.episodeDuration = INITIAL_DEMO_ITEMS[0].episodeDuration;
-            updated = true;
-          }
-        }
-        if (item.id === 'demo-2') {
-          if (item.poster && item.poster.includes('Video116/v4/bf/f4/ba/bff4baa7-48f8-809c-3fa8-17a48d8a6fc6')) {
-            item.poster = INITIAL_DEMO_ITEMS[1].poster;
-            item.backdrop = INITIAL_DEMO_ITEMS[1].backdrop;
-            updated = true;
-          }
-          if (!item.durationMinutes) {
-            item.durationMinutes = INITIAL_DEMO_ITEMS[1].durationMinutes;
-            item.duration = INITIAL_DEMO_ITEMS[1].duration;
-            updated = true;
-          }
-        }
-        if (item.id === 'demo-3') {
-          if (!item.originalId) { item.originalId = 2993; updated = true; }
-          if (!item.apiId) { item.apiId = 'tvmaze_2993'; updated = true; }
-          if (!item.duration) {
-            item.duration = INITIAL_DEMO_ITEMS[2].duration;
-            item.episodeDuration = INITIAL_DEMO_ITEMS[2].episodeDuration;
-            updated = true;
-          }
-        }
-        if (item.id === 'demo-4') {
-          if (item.poster && item.poster.includes('Video221/v4/97/3d/bf/973dbfa1-ff8b-ca52-25e6-c14fe47f48a9')) {
-            item.poster = INITIAL_DEMO_ITEMS[3].poster;
-            item.backdrop = INITIAL_DEMO_ITEMS[3].backdrop;
-            updated = true;
-          }
-          if (!item.durationMinutes) {
-            item.durationMinutes = INITIAL_DEMO_ITEMS[3].durationMinutes;
-            item.duration = INITIAL_DEMO_ITEMS[3].duration;
-            updated = true;
-          }
-        }
-
         // Asegurar estructura de episodios en series
         if (item.type === 'series') {
           if (!Array.isArray(item.watchedEpisodes)) {
             item.watchedEpisodes = [];
             // Si ya tenía episodios vistos registrados, se inicializarán cuando se cargue su episodesList
+            updated = true;
           }
         }
 
@@ -466,8 +336,8 @@ const STORAGE_SERVICE = {
    * Reinicia la biblioteca
    */
   clearAll() {
-    // Se guarda una lista vacía ("[]"), no se borra la clave: si faltara,
-    // getItems() lo tomaría por una primera ejecución y volvería a cargar los ejemplos
+    // Se guarda una lista vacía ("[]") en vez de borrar la clave, para que
+    // getItems() no lo tome por una instalación nueva
     this.saveItems([]);
     return [];
   }
